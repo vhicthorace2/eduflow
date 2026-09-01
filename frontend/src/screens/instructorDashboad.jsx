@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
 import BackButton from '../component/backButton.jsx';
+import { courseCover } from '../component/courseCovers.js';
+import lectureImg from '../assets/lecture.jpg';
 
 function InstructorDashboard() {
   const [dashboard, setDashboard] = useState(null);
@@ -39,21 +41,31 @@ function InstructorDashboard() {
 
   return (
     <div className="relative min-h-screen bg-page text-content">
-      <div className="pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-emerald-500/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]" />
       <Sidebar />
-      <div className="relative ml-72 px-6 py-10 sm:px-8 lg:px-16">
+      <div className="relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 md:ml-72">
         <div className="mx-auto max-w-6xl space-y-6">
           <div>
             <BackButton />
           </div>
 
           {/* Header */}
-          <div className="rounded-3xl border border-line bg-card p-8 shadow-2xl backdrop-blur-xl sm:p-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid">Instructor Dashboard</p>
-            <h1 className="font-display mt-3 text-3xl font-semibold tracking-tight">Teach with impact</h1>
-            <p className="mt-3 text-muted">
-              Manage classes, monitor student progress, and publish new content.
-            </p>
+          <div className="shadow-panel relative overflow-hidden rounded-3xl border border-line bg-card p-8 sm:p-10">
+            <img
+              src={lectureImg}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full object-cover opacity-20"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/40" aria-hidden="true" />
+            <div className="relative">
+              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid">Instructor Dashboard</p>
+              <h1 className="tracking-display font-display mt-3 text-3xl font-medium">Teach with impact</h1>
+              <p className="mt-3 text-muted">
+                Manage classes, monitor student progress, and publish new content.
+              </p>
+            </div>
           </div>
 
           {error && (
@@ -93,9 +105,15 @@ function InstructorDashboard() {
                       {courses.map((course) => (
                         <li
                           key={course.id}
-                          className="flex items-center justify-between gap-4 rounded-xl border border-line bg-card-deep px-5 py-4"
+                          className="flex items-center gap-4 rounded-xl border border-line bg-card-deep px-5 py-4"
                         >
-                          <div className="min-w-0">
+                          <img
+                            src={courseCover(course.title)}
+                            alt=""
+                            className="h-12 w-16 shrink-0 rounded-lg object-cover"
+                            loading="lazy"
+                          />
+                          <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-secondary">{course.title}</p>
                             <p className="mt-0.5 text-xs text-muted">
                               {course.enrolledStudents ?? 0} students
@@ -104,7 +122,7 @@ function InstructorDashboard() {
                           <span
                             className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
                               course.isActive
-                                ? 'border border-emerald-400/30 bg-emerald-400/10 text-accent-soft'
+                                ? 'border border-orange-400/30 bg-orange-400/10 text-accent-soft'
                                 : 'border border-slate-400/30 bg-slate-400/10 text-secondary'
                             }`}
                           >
@@ -119,16 +137,16 @@ function InstructorDashboard() {
                 </div>
 
                 {/* Publish CTA */}
-                <div className="flex flex-col rounded-3xl border border-emerald-400/20 bg-hero-band p-8 backdrop-blur-xl">
+                <div className="flex flex-col rounded-3xl border border-orange-400/20 bg-hero-band p-8 backdrop-blur-xl">
                   <h2 className="text-lg font-semibold">Publish new content</h2>
                   <p className="mt-2 text-sm leading-6 text-secondary">
                     Create a new course, assignment, or quiz and share it with your students.
                   </p>
                   <button
-                    onClick={() => navigate('/courses')}
-                    className="mt-6 w-fit rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-xl transition hover:-translate-y-0.5 hover:bg-emerald-100"
+                    onClick={() => navigate('/instructorContent')}
+                    className="mt-6 w-fit rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-[var(--page)] shadow-xl transition hover:-translate-y-0.5 hover:opacity-90"
                   >
-                    Manage courses
+                    Manage course content
                   </button>
                 </div>
               </div>

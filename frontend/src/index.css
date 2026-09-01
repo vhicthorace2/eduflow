@@ -7,47 +7,49 @@
 }
 
 :root {
-  color-scheme: dark;
-  --page: #020617;
-  --page-soft: rgba(2, 6, 23, 0.5);
-  --page-solid: #020617;
-  --card: rgba(255, 255, 255, 0.05);
-  --card-strong: rgba(255, 255, 255, 0.12);
-  --card-deep: rgba(2, 6, 23, 0.4);
-  --card-hover: rgba(255, 255, 255, 0.1);
-  --line: rgba(255, 255, 255, 0.1);
-  --line-strong: rgba(255, 255, 255, 0.15);
-  --content: #ffffff;
-  --secondary: #cbd5e1;
-  --muted: #94a3b8;
-  --faint: #64748b;
-  --accent-mid: #34d399;
-  --accent: #6ee7b7;
-  --accent-soft: #a7f3d0;
-  --danger: #fecaca;
-  --info: #bae6fd;
-}
-
-html.light {
+  /* 60% white dominant / 30% black secondary / 10% orange accent */
   color-scheme: light;
-  --page: #f1f5f9;
-  --page-soft: rgba(255, 255, 255, 0.75);
+  --page: #ffffff;
+  --page-soft: rgba(255, 255, 255, 0.78);
   --page-solid: #ffffff;
   --card: #ffffff;
-  --card-strong: #e2e8f0;
-  --card-deep: #ffffff;
-  --card-hover: #f8fafc;
-  --line: rgba(15, 23, 42, 0.1);
-  --line-strong: rgba(15, 23, 42, 0.15);
-  --content: #0f172a;
-  --secondary: #334155;
-  --muted: #64748b;
-  --faint: #94a3b8;
-  --accent-mid: #059669;
-  --accent: #059669;
-  --accent-soft: #047857;
+  --card-strong: #f3f4f6;
+  --card-deep: #fafafa;
+  --card-hover: #f3f4f6;
+  --line: rgba(0, 0, 0, 0.09);
+  --line-strong: rgba(0, 0, 0, 0.16);
+  --content: #0a0a0a;
+  --secondary: #1f2937;
+  --muted: #525252;
+  --faint: #9ca3af;
+  --accent-mid: #ea580c;
+  --accent: #f97316;
+  --accent-soft: #c2410c;
   --danger: #b91c1c;
   --info: #0369a1;
+}
+
+/* Dark mode inverts the split: 60% black / 30% white / 10% orange */
+html.dark {
+  color-scheme: dark;
+  --page: #0a0a0a;
+  --page-soft: rgba(10, 10, 10, 0.5);
+  --page-solid: #0a0a0a;
+  --card: #171717;
+  --card-strong: #262626;
+  --card-deep: #101010;
+  --card-hover: #1f1f1f;
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --content: #ffffff;
+  --secondary: #e5e5e5;
+  --muted: #a3a3a3;
+  --faint: #737373;
+  --accent-mid: #f97316;
+  --accent: #fb923c;
+  --accent-soft: #fdba74;
+  --danger: #fecaca;
+  --info: #bae6fd;
 }
 
 .bg-page { background-color: var(--page); }
@@ -71,16 +73,20 @@ html.light {
 .text-info { color: var(--info); }
 .placeholder\:text-muted::placeholder { color: var(--muted); }
 
+.bg-accent { background-color: var(--accent); }
+.border-accent { border-color: var(--accent); }
+.hover\:border-accent:hover { border-color: var(--accent); }
+
 .bg-hero-band {
-  background-image: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(15, 23, 42, 0.9) 55%, var(--page));
+  background-image: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(255, 255, 255, 0.92));
 }
 
-html.light .bg-hero-band {
-  background-image: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(255, 255, 255, 0.9));
+html.dark .bg-hero-band {
+  background-image: linear-gradient(135deg, rgba(249, 115, 22, 0.22), rgba(10, 10, 10, 0.96) 60%, #0a0a0a);
 }
 
 .bg-hero-dark {
-  background-image: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(15, 23, 42, 0.95) 60%, #020617);
+  background-image: linear-gradient(135deg, rgba(249, 115, 22, 0.28), #0a0a0a 72%);
 }
 
 .text-gradient {
@@ -90,12 +96,99 @@ html.light .bg-hero-band {
   color: transparent;
 }
 
+/* Editorial dot grid motif (identity element, replaces floating blobs) */
+.bg-dot-grid {
+  background-image: radial-gradient(color-mix(in srgb, var(--content) 9%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Hairline rules + vertical rule used in editorial layouts */
+.rule-h {
+  border-top: 1px solid var(--line);
+}
+.rule-v {
+  border-left: 1px solid var(--line);
+}
+.rule-h-strong {
+  border-top: 1px solid var(--line-strong);
+}
+
+/* Layered depth without glassmorphism */
+.shadow-panel {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--content) 6%, transparent) inset, 0 24px 40px -24px rgba(15, 23, 42, 0.14);
+}
+html.dark .shadow-panel {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--content) 8%, transparent) inset, 0 24px 48px -24px rgba(0, 0, 0, 0.5);
+}
+
+/* Display type: tightened, confident */
+.tracking-display {
+  letter-spacing: -0.02em;
+}
+
+/* Scroll reveal (see component/reveal.jsx) */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Accessible focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--accent-mid);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
   font-family: var(--font-sans);
   background-color: var(--page);
+  color: var(--content);
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "liga", "calt";
+  letter-spacing: -0.011em;
+  overflow-x: hidden;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Decorative blur blobs are removed globally. The visual identity is
+   solid layered cards + dot grid + hairline rules, so every screen
+   reads fine with no glassmorphism at all. */
+[class*="pointer-events-none"][class*="rounded-full"][class*="blur-["] {
+  display: none;
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--content);
 }

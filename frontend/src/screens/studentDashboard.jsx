@@ -3,14 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import api, { userStore } from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
 import BackButton from '../component/backButton.jsx';
+import WelcomeHeading from '../component/welcomeHeading.jsx';
+import { courseCover } from '../component/courseCovers.js';
+import studentHeroImg from '../assets/student-hero.jpg';
 
 const ASSESSMENT_TIME_LIMIT = 120;
 
-const difficultyStyles = {
-  beginner: 'border-sky-400/40 bg-sky-400/15 text-info',
-  intermediate: 'border-amber-400/40 bg-amber-400/15 text-amber-500',
-  advanced: 'border-red-400/40 bg-red-400/15 text-danger',
-};
+const SECTIONS = [
+  { id: 'courses', label: 'My Courses' },
+  { id: 'tasks', label: 'Upcoming Tasks' },
+  { id: 'results', label: 'Recent Results' },
+  { id: 'available', label: 'Available Courses' },
+];
+
 
 function StudentDashboard() {
   const [user] = useState(userStore.get());
@@ -20,9 +25,11 @@ function StudentDashboard() {
   const [cgpa, setCgpa] = useState(null);
   const [availableCourses, setAvailableCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [section, setSection] = useState('courses');
   const navigate = useNavigate();
 
   const [timeLeft, setTimeLeft] = useState(ASSESSMENT_TIME_LIMIT);
+  const [redirectCountdown, setRedirectCountdown] = useState(null);
   const submitRef = useRef(null);
   submitRef.current = () => {
     const { assessmentId, answers } = wizard;
@@ -64,6 +71,13 @@ function StudentDashboard() {
       });
     return () => { active = false; };
   }, []);
+
+  const refreshEnrolledCourses = async () => {
+    const data = await api.get('/courses/my-courses').catch(() => ({ courses: [] }));
+    setCourses(data.courses || []);
+  };
+
+  const enrolledIds = new Set((courses || []).map((c) => c.id));
 
   const [moduleCounts, setModuleCounts] = useState({});
 
@@ -115,7 +129,7 @@ function StudentDashboard() {
   const startAssessment = async () => {
     setWizard((w) => ({ ...w, phase: 'questions', error: null }));
     try {
-      const data = await api.post('/assessment/start', { course: wizard.course.title });
+      const data = await api.post('/assessment/start', { course: wizard.course.title, courseId: wizard.course.id });
       setWizard((w) => ({
         ...w,
         assessmentId: data.assessmentId,
@@ -142,6 +156,8 @@ function StudentDashboard() {
         assessmentId,
         answers,
       });
+      await refreshEnrolledCourses();
+      setRedirectCountdown(3);
       setWizard((w) => ({ ...w, phase: 'result', result: data }));
     } catch (error) {
       setWizard((w) => ({ ...w, error: error.message || 'Failed to submit assessment' }));
@@ -150,9 +166,13 @@ function StudentDashboard() {
 
   const goToStudy = () => {
     const courseId = wizard.course?.id;
+    const moduleOrder = wizard.result?.recommendedModuleOrder;
     closeWizard();
-    if (courseId) navigate(`/courses/${courseId}`);
+    if (courseId) navigate(moduleOrder ? `/courses/${courseId}?module=${moduleOrder}` : `/courses/${courseId}`);
   };
+
+  const autoRedirectRef = useRef(null);
+  autoRedirectRef.current = goToStudy;
 
   useEffect(() => {
     if (wizard.phase !== 'questions' || !wizard.assessmentId) return undefined;
@@ -172,7 +192,19 @@ function StudentDashboard() {
     }
   }, [timeLeft, wizard.phase]);
 
+  useEffect(() => {
+    if (wizard.phase !== 'result' || wizard.result?.recommendedModuleOrder == null) return undefined;
+    if (redirectCountdown === 0) {
+      autoRedirectRef.current();
+      return undefined;
+    }
+    if (redirectCountdown === null) return undefined;
+    const timer = setTimeout(() => setRedirectCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [wizard.phase, wizard.result, redirectCountdown]);
+
   const closeWizard = () => {
+    setRedirectCountdown(null);
     setWizard({ open: false, course: null, phase: 'intro', assessmentId: null, questions: [], answers: [], result: null, error: null });
   };
 
@@ -180,23 +212,33 @@ function StudentDashboard() {
 
   return (
     <div className="relative min-h-screen bg-page text-content">
-      <div className="pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-emerald-500/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]" />
       <Sidebar />
-      <div className="relative ml-72 px-6 py-10 sm:px-8 lg:px-16">
+      <div className="relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 md:ml-72">
         <div className="mx-auto max-w-6xl space-y-6">
           <div>
             <BackButton />
           </div>
 
           {/* Header */}
-          <div className="rounded-3xl border border-line bg-card p-8 shadow-2xl backdrop-blur-xl sm:p-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid">Student Dashboard</p>
-            <h1 className="font-display mt-3 text-3xl font-semibold tracking-tight">
-              Welcome back, {user?.name || 'learner'}
-            </h1>
-            <p className="mt-3 text-muted">
-              Track your enrolled courses, assignments, and learning progress here.
-            </p>
+          <div className="shadow-panel relative overflow-hidden rounded-3xl border border-line bg-card p-8 sm:p-10">
+            <img
+              src={studentHeroImg}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full object-cover opacity-20"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/40" aria-hidden="true" />
+            <div className="relative">
+              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid">Student Dashboard</p>
+              <h1 className="tracking-display font-display mt-3 text-3xl font-medium">
+                <WelcomeHeading name={user?.name || 'learner'} />
+              </h1>
+              <p className="mt-3 text-muted">
+                Track your enrolled courses, assignments, and learning progress here.
+              </p>
+            </div>
           </div>
 
           {/* Stats row */}
@@ -207,7 +249,7 @@ function StudentDashboard() {
                   key={stat.title}
                   className={`rounded-2xl border p-6 backdrop-blur-xl transition hover:bg-card-hover ${
                     stat.title === 'CGPA'
-                      ? 'border-emerald-400/40 bg-emerald-400/10'
+                      ? 'border-orange-400/40 bg-orange-400/10'
                       : 'border-line bg-card'
                   }`}
                 >
@@ -226,10 +268,27 @@ function StudentDashboard() {
             </div>
           )}
 
-          {/* Main grid */}
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            {/* My Courses */}
-            <div className="rounded-3xl border border-line bg-card p-8 backdrop-blur-xl">
+          {/* Section tabs */}
+          <div className="flex flex-wrap gap-2 rounded-3xl border border-line bg-card p-2 backdrop-blur-xl" role="tablist">
+            {SECTIONS.map((s) => (
+              <button
+                key={s.id}
+                role="tab"
+                aria-selected={section === s.id}
+                onClick={() => setSection(s.id)}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  section === s.id
+                    ? 'bg-orange-500/15 text-accent ring-1 ring-inset ring-orange-400/30'
+                    : 'text-muted hover:bg-card-hover hover:text-content'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {section === 'courses' && (
+            <div className="rounded-3xl border border-line bg-card p-6 backdrop-blur-xl sm:p-8">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">My Courses</h2>
                 <button
@@ -247,14 +306,20 @@ function StudentDashboard() {
                     <li key={course.id}>
                       <button
                         onClick={() => navigate(`/courses/${course.id}`)}
-                        className="group w-full rounded-xl border border-line bg-card-deep px-5 py-4 text-left transition hover:border-emerald-400/30 hover:bg-card-hover"
+                        className="group w-full rounded-xl border border-line bg-card-deep px-5 py-4 text-left transition hover:border-orange-400/30 hover:bg-card-hover"
                       >
-                        <div className="flex items-center justify-between gap-4">
-                          <p className="text-sm font-medium text-secondary">{course.title}</p>
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={courseCover(course.title)}
+                            alt=""
+                            className="h-12 w-16 shrink-0 rounded-lg object-cover"
+                            loading="lazy"
+                          />
+                          <p className="min-w-0 flex-1 truncate text-sm font-medium text-secondary">{course.title}</p>
                           <span className="shrink-0 text-xs font-semibold text-accent transition group-hover:translate-x-1">→</span>
                         </div>
                         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line-strong">
-                          <div className="h-full w-0 rounded-full bg-emerald-400" />
+                          <div className="h-full w-0 rounded-full bg-orange-400" />
                         </div>
                       </button>
                     </li>
@@ -269,9 +334,10 @@ function StudentDashboard() {
                 </p>
               )}
             </div>
+          )}
 
-            {/* Upcoming Tasks */}
-            <div className="rounded-3xl border border-line bg-card p-8 backdrop-blur-xl">
+          {section === 'tasks' && (
+            <div className="rounded-3xl border border-line bg-card p-6 backdrop-blur-xl sm:p-8">
               <h2 className="text-lg font-semibold">Upcoming Tasks</h2>
               <p className="mt-2 text-sm text-muted">
                 Quizzes and assignments will appear here once published.
@@ -285,14 +351,14 @@ function StudentDashboard() {
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Available Courses */}
-          <div className="rounded-3xl border border-line bg-card p-8 backdrop-blur-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Available Courses</h2>
-                <p className="mt-1 text-sm text-muted">
+          {section === 'available' && (
+            <div className="rounded-3xl border border-line bg-card p-6 backdrop-blur-xl sm:p-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Available Courses</h2>
+                  <p className="mt-1 text-sm text-muted">
                   Take a placement assessment to get a recommended learning level for any course.
                 </p>
               </div>
@@ -311,13 +377,17 @@ function StudentDashboard() {
                 {availableCourses.map((course) => (
                   <div
                     key={course.id}
-                    className="flex flex-col rounded-2xl border border-line bg-card-deep p-6 transition hover:border-emerald-400/30 hover:bg-card-hover"
+                    className="flex flex-col rounded-2xl border border-line bg-card-deep p-6 transition hover:border-orange-400/30 hover:bg-card-hover"
                   >
-                    <div className="flex items-center justify-between gap-3">
+                    <img
+                      src={courseCover(course.title)}
+                      alt={`${course.title} cover`}
+                      className="aspect-[16/9] w-full rounded-xl object-cover"
+                      loading="lazy"
+                    />
+                    <div className="mt-4 flex items-center justify-between gap-3">
                       <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                          difficultyStyles[course.difficulty] || difficultyStyles.beginner
-                        }`}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold `}
                       >
                         {course.difficulty}
                       </span>
@@ -331,73 +401,84 @@ function StudentDashboard() {
                     <p className="mt-2 line-clamp-2 flex-1 text-sm text-muted">
                       {course.description}
                     </p>
-                    <button
-                      onClick={() => openWizard(course)}
-                      className="mt-5 w-full rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-sm font-semibold text-accent-soft transition hover:bg-emerald-400/20"
-                    >
-                      Take Assessment
-                    </button>
+                    {enrolledIds.has(course.id) ? (
+                      <button
+                        onClick={() => navigate(`/courses/${course.id}`)}
+                        className="mt-5 w-full rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent-soft transition hover:bg-accent/20"
+                      >
+                        Enrolled · View course →
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => openWizard(course)}
+                        className="mt-5 w-full rounded-xl border border-orange-400/40 bg-orange-400/10 px-4 py-2.5 text-sm font-semibold text-accent-soft transition hover:bg-orange-400/20"
+                      >
+                        Take Assessment
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
               <p className="mt-6 text-sm text-muted">No courses available yet.</p>
             )}
-          </div>
-
-          {/* Bottom grid */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Recent Quiz Results */}
-            <div className="rounded-3xl border border-line bg-card p-8 backdrop-blur-xl">
-              <h2 className="text-lg font-semibold">Recent Quiz Results</h2>
-              {loading ? (
-                <p className="mt-4 text-sm text-muted">Loading...</p>
-              ) : attempts.length > 0 ? (
-                <ul className="mt-4 space-y-3">
-                  {attempts.slice(0, 5).map((attempt) => (
-                    <li key={attempt.id} className="flex items-center justify-between gap-4 rounded-xl border border-line bg-card-deep px-4 py-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-secondary">{attempt.quiz?.title || 'Quiz'}</p>
-                        <p className="mt-0.5 text-xs text-muted">
-                          {attempt.percentage}% · {attempt.completedAt ? new Date(attempt.completedAt).toLocaleDateString() : ''}
-                        </p>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                          attempt.passed
-                            ? 'border border-emerald-400/30 bg-emerald-400/10 text-accent-soft'
-                            : 'border border-red-400/30 bg-red-400/10 text-danger'
-                        }`}
-                      >
-                        {attempt.passed ? 'Passed' : 'Retry'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-4 text-sm text-muted">No quiz attempts yet.</p>
-              )}
             </div>
+          )}
 
-            {/* My Grades */}
-            <div className="rounded-3xl border border-line bg-card p-8 backdrop-blur-xl">
-              <h2 className="text-lg font-semibold">My Grades</h2>
-              {loading ? (
-                <p className="mt-4 text-sm text-muted">Loading...</p>
-              ) : grades.length > 0 ? (
-                <ul className="mt-4 space-y-3">
-                  {grades.slice(0, 5).map((grade) => (
-                    <li key={grade.id} className="flex items-center justify-between gap-4 rounded-xl border border-line bg-card-deep px-4 py-3">
-                      <p className="min-w-0 truncate text-sm font-medium text-secondary">{grade.course?.title || 'Course'}</p>
-                      <span className="shrink-0 text-sm font-semibold text-accent">{Math.round(grade.overallGrade || 0)}%</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-4 text-sm text-muted">No grades published yet.</p>
-              )}
+          {section === 'results' && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Recent Quiz Results */}
+              <div className="rounded-3xl border border-line bg-card p-6 backdrop-blur-xl sm:p-8">
+                <h2 className="text-lg font-semibold">Recent Quiz Results</h2>
+                {loading ? (
+                  <p className="mt-4 text-sm text-muted">Loading...</p>
+                ) : attempts.length > 0 ? (
+                  <ul className="mt-4 space-y-3">
+                    {attempts.slice(0, 5).map((attempt) => (
+                      <li key={attempt.id} className="flex items-center justify-between gap-4 rounded-xl border border-line bg-card-deep px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-secondary">{attempt.quiz?.title || 'Quiz'}</p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            {attempt.percentage}% · {attempt.completedAt ? new Date(attempt.completedAt).toLocaleDateString() : ''}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                            attempt.passed
+                              ? 'border border-orange-400/30 bg-orange-400/10 text-accent-soft'
+                              : 'border border-red-400/30 bg-red-400/10 text-danger'
+                          }`}
+                        >
+                          {attempt.passed ? 'Passed' : 'Retry'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 text-sm text-muted">No quiz attempts yet.</p>
+                )}
+              </div>
+
+              {/* My Grades */}
+              <div className="rounded-3xl border border-line bg-card p-6 backdrop-blur-xl sm:p-8">
+                <h2 className="text-lg font-semibold">My Grades</h2>
+                {loading ? (
+                  <p className="mt-4 text-sm text-muted">Loading...</p>
+                ) : grades.length > 0 ? (
+                  <ul className="mt-4 space-y-3">
+                    {grades.slice(0, 5).map((grade) => (
+                      <li key={grade.id} className="flex items-center justify-between gap-4 rounded-xl border border-line bg-card-deep px-4 py-3">
+                        <p className="min-w-0 truncate text-sm font-medium text-secondary">{grade.course?.title || 'Course'}</p>
+                        <span className="shrink-0 text-sm font-semibold text-accent">{Math.round(grade.overallGrade || 0)}%</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 text-sm text-muted">No grades published yet.</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -428,11 +509,11 @@ function StudentDashboard() {
                 <h2 className="font-display mt-3 text-2xl font-semibold tracking-tight">{wizard.course?.title}</h2>
                 <p className="mt-3 text-sm text-muted">
                   You will answer {wizard.course ? '10' : ''} questions generated for this course.
-                  Based on your answers, we will recommend a starting level and a first lesson.
+                  Based on your answers, we will recommend a starting level and a module.  
                 </p>
                 <button
                   onClick={startAssessment}
-                  className="mt-8 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+                  className="mt-8 w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-orange-400"
                 >
                   Start Assessment
                 </button>
@@ -479,14 +560,14 @@ function StudentDashboard() {
                                 key={option}
                                 className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition ${
                                   selected
-                                    ? 'border-emerald-400/50 bg-emerald-400/10 text-accent-soft'
+                                    ? 'border-orange-400/50 bg-orange-400/10 text-accent-soft'
                                     : 'border-line bg-card text-secondary hover:border-line-strong'
                                 }`}
                               >
                                 <input
                                   type="radio"
                                   name={`question-${qIndex}`}
-                                  className="accent-emerald-400"
+                                  className="accent-orange-400"
                                   checked={selected}
                                   onChange={() => selectAnswer(qIndex, option)}
                                 />
@@ -503,7 +584,7 @@ function StudentDashboard() {
                 <button
                   onClick={() => submitAssessment(wizard.assessmentId, wizard.answers)}
                   disabled={answeredCount < wizard.questions.length || wizard.questions.length === 0}
-                  className="mt-8 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-line-strong disabled:text-muted"
+                  className="mt-8 w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-line-strong disabled:text-muted"
                 >
                   {answeredCount < wizard.questions.length
                     ? `Answer all questions to continue (${answeredCount}/${wizard.questions.length})`
@@ -517,7 +598,7 @@ function StudentDashboard() {
                 <div
                   className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border ${
                     wizard.result.percentage >= 50
-                      ? 'border-emerald-400/40 bg-emerald-400/10'
+                      ? 'border-orange-400/40 bg-orange-400/10'
                       : 'border-amber-400/40 bg-amber-400/10'
                   }`}
                 >
@@ -531,8 +612,16 @@ function StudentDashboard() {
                 </h2>
                 <p className="mt-3 text-sm text-muted">
                   You scored {wizard.result.score} out of {wizard.result.total}. Start with{' '}
-                  <span className="font-semibold text-secondary">{wizard.result.nextLesson}</span>.
+                  <span className="font-semibold text-secondary">
+                    {wizard.result.recommendedModule || wizard.result.nextLesson}
+                  </span>
+                  .
                 </p>
+                {wizard.result.recommendedModuleOrder != null && (
+                  <p className="mt-4 rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-3 text-sm font-medium text-accent-soft">
+                    Taking you to {wizard.result.recommendedModule} in {redirectCountdown ?? 0}s…
+                  </p>
+                )}
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <button
                     onClick={() => startAssessment()}
@@ -542,7 +631,7 @@ function StudentDashboard() {
                   </button>
                   <button
                     onClick={goToStudy}
-                    className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+                    className="flex-1 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-orange-400"
                   >
                     Start studying →
                   </button>

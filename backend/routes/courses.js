@@ -8,7 +8,8 @@ const {
   deleteCourse,
   enrollCourse,
   getMyCourses,
-  getInstructorCourses
+  getInstructorCourses,
+  getLearningPath
 } = require('../controllers/courseController');
 const auth = require('../middleware/auth');
 const { isInstructorOrAdmin, isInstructor } = require('../middleware/rbac');
@@ -17,13 +18,14 @@ const { isInstructorOrAdmin, isInstructor } = require('../middleware/rbac');
 router.get('/', getAllCourses);
 router.get('/my-courses', auth, getMyCourses);
 router.get('/instructor-courses', auth, isInstructor, getInstructorCourses);
+router.get('/:id/learning-path', auth, getLearningPath);
 router.get('/:id', getCourseById);
 
 // Protected routes
 router.post('/enroll/:id', auth, enrollCourse);
 
-// Instructor only routes
-router.post('/', auth, isInstructor, createCourse);
+// Instructor/Admin routes
+router.post('/', auth, isInstructorOrAdmin, createCourse);
 router.put('/:id', auth, isInstructorOrAdmin, updateCourse);
 router.delete('/:id', auth, isInstructorOrAdmin, deleteCourse);
 

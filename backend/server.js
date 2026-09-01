@@ -24,6 +24,8 @@ const reportRoutes = require('./routes/reports');
 const adminRoutes = require('./routes/admin');
 const assessmentRoutes = require('./routes/assessmentRoutes');
 const settingsRoutes = require('./routes/settings');
+const activityRoutes = require('./routes/activity');
+const leaderboardRoutes = require('./routes/leaderboard');
 
 // Initialize Express app
 const app = express();
@@ -43,7 +45,7 @@ app.use(compression());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs to ensure load b
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
@@ -69,6 +71,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/assessment', assessmentRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

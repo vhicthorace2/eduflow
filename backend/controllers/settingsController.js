@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const { Op } = require('sequelize');
+const path = require('path');
+const fs = require('fs');
 
 const DEFAULT_PREFERENCES = { email: true, push: false, digest: true };
 
@@ -89,6 +91,43 @@ exports.updateSettings = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Settings updated successfully',
+      user: serializeUser(user)
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update current user's profile photo (multipart, field: avatar)
+ * @route PUT /api/settings/me/avatar
+ */
+exports.updateAvatar = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      const err = new Error('No image uploaded');
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    const user = await User.findByPk(req.user.id);
+    const previousAvatar = user.avatar;
+    const nextAvatar = `/uploads/${req.file.filename}`;
+
+    user.avatar = nextAvatar;
+    await user.save();
+
+    // Best-effort cleanup of the previous uploaded avatar (never the dev fallback)
+    if (previousAvatar && previousAvatar.startsWith('/uploads/')) {
+      const prevPath = path.join(process.cwd(), 'uploads', path.basename(previousAvatar));
+      if (prevPath !== req.file.path) {
+        fs.unlink(prevPath, () => {});
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile photo updated',
       user: serializeUser(user)
     });
   } catch (error) {

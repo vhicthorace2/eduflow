@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api, { tokenStore, userStore } from '../api/client.js';
 import Navbar from '../component/navigation.jsx';
 import BackButton from '../component/backButton.jsx';
+import avatarImg from '../assets/avatar-m.jpg';
 
 function Profile() {
   const [user, setUser] = useState(userStore.get());
@@ -29,8 +30,6 @@ function Profile() {
     return () => { active = false; };
   }, []);
 
-  const initial = (user?.name || 'V').charAt(0).toUpperCase();
-
   if (!tokenStore.get() && !user) {
     return (
       <div className='relative min-h-screen bg-page px-6 py-10 text-content sm:px-8 lg:px-16'>
@@ -47,22 +46,27 @@ function Profile() {
 
   return (
     <div className='relative min-h-screen bg-page px-6 py-10 text-content sm:px-8 lg:px-16'>
-      <div className='pointer-events-none absolute -right-40 top-20 h-[28rem] w-[28rem] rounded-full bg-emerald-500/10 blur-[130px]' />
+      <div className='pointer-events-none absolute -right-40 top-20 h-[28rem] w-[28rem] rounded-full bg-orange-500/10 blur-[130px]' />
       <Navbar />
 
       <div className='relative mx-auto mt-32 max-w-6xl'>
         <BackButton className='mb-6' />
         <div className='overflow-hidden rounded-3xl border border-line bg-card shadow-2xl backdrop-blur-xl'>
           <div className='relative bg-hero-dark px-8 py-12 text-white sm:px-10 lg:px-12'>
-            <div className='pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-emerald-400/20 blur-[80px]' />
+            <div className='pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-orange-400/20 blur-[80px]' />
             <div className='relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
               <div className='flex items-center gap-6'>
-                <div className='flex h-24 w-24 items-center justify-center rounded-full border border-white/30 bg-white/10 text-3xl font-semibold shadow-lg backdrop-blur-md'>
-                  {initial}
+                <div className='h-24 w-24 overflow-hidden rounded-full border border-white/30 shadow-lg'>
+                  <img
+                    src={avatarImg}
+                    alt={`${user?.name || 'User'} profile photo`}
+                    className='h-full w-full object-cover'
+                    loading='lazy'
+                  />
                 </div>
                 <div>
                   <h1 className='font-display text-3xl font-semibold tracking-tight'>{user?.name || 'Loading...'}</h1>
-                  <p className='mt-2 capitalize text-emerald-200'>{user?.role || ''}</p>
+                  <p className='mt-2 capitalize text-orange-200'>{user?.role || ''}</p>
                 </div>
               </div>
             </div>

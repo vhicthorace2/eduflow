@@ -2,6 +2,7 @@ const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const Course = require('../models/Course');
 const User = require('../models/User');
+const ActivityLog = require('../models/ActivityLog');
 
 /**
  * Get all quizzes for a course
@@ -93,11 +94,12 @@ exports.createQuiz = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized to create quizzes for this course' });
     }
 
-    const { title, description, questions, timeLimit, maxAttempts, passingScore } = req.body;
+    const { title, description, type, questions, timeLimit, maxAttempts, passingScore } = req.body;
 
     const quiz = await Quiz.create({
       title,
       description,
+      type: type || 'quiz',
       courseId: req.params.courseId,
       instructorId: req.user.id,
       questions,
@@ -236,6 +238,13 @@ exports.submitQuiz = async (req, res, next) => {
       percentage,
       passed,
       timeSpent: timeSpent || 0
+    });
+
+    await ActivityLog.create({
+      studentId: req.user.id,
+      courseId: quiz.courseId,
+      activityType: 'quiz_attempt',
+      performedAt: new Date()
     });
 
     res.status(201).json({

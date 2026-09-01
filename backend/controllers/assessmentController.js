@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { generateAssessment } = require('../.agents/assessmentAgent.js');
 const { evaluateAnswers } = require('../.agents/evaluationAgent.js');
 const { recommend } = require('../.agents/recommendationAgent.js');
+const { Course, Module, Enrollment } = require('../models');
 
 const activeAssessments = new Map();
 
@@ -14,7 +15,7 @@ const sanitizeQuestions = (questions) =>
  */
 exports.startAssessment = async (req, res, next) => {
   try {
-    const { course } = req.body;
+    const { course, courseId } = req.body;
 
     if (!course || typeof course !== 'string') {
       return res.status(400).json({ message: 'Course topic is required' });
@@ -25,6 +26,7 @@ exports.startAssessment = async (req, res, next) => {
     const assessmentId = crypto.randomUUID();
     activeAssessments.set(assessmentId, {
       course,
+      courseId: courseId || null,
       questions,
       correctAnswers: questions.map((q) => q.correctAnswer)
     });
@@ -60,7 +62,37 @@ exports.submitAssessment = async (req, res, next) => {
     const score = evaluateAnswers(answers, assessment.correctAnswers);
     const total = assessment.correctAnswers.length;
     const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
-    const recommendation = recommend(percentage);
+
+    let modules = [];
+    let enrolled = false;
+    try {
+      const course = assessment.courseId
+        ? await Course.findByPk(assessment.courseId)
+        : await Course.findOne({ where: { title: assessment.course } });
+      if (course) {
+        const courseModules = await Module.findAll({
+          where: { courseId: course.id, isActive: true },
+          order: [['order', 'ASC']]
+        });
+        modules = courseModules.map((m) => m.title);
+
+        if (req.user && req.user.id) {
+          const [, created] = await Enrollment.findOrCreate({
+            where: { courseId: course.id, studentId: req.user.id },
+            defaults: { status: 'active', enrolledAt: new Date() }
+          });
+          enrolled = true;
+          if (created) {
+            console.log(`Enrolled student ${req.user.id} in course ${course.id}`);
+          }
+        }
+      }
+    } catch (error) {
+      modules = [];
+      enrolled = false;
+    }
+
+    const recommendation = recommend(percentage, modules);
 
     activeAssessments.delete(assessmentId);
 
@@ -69,6 +101,7 @@ exports.submitAssessment = async (req, res, next) => {
       score,
       total,
       percentage,
+      enrolled,
       ...recommendation
     });
   } catch (error) {

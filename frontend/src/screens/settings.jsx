@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api, { userStore, tokenStore } from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
 import BackButton from '../component/backButton.jsx';
 import { useTheme } from '../component/themeContext.js';
 import ThemeToggle from '../component/theme.jsx';
+import PasswordInput from '../component/passwordInput.jsx';
+import avatarImg from '../assets/avatar-f.jpg';
 
 const DEFAULT_NOTIFICATIONS = { email: true, push: false, digest: true };
 
-const inputClass = 'w-full rounded-xl border border-line bg-card-deep px-4 py-3 text-sm text-content outline-none transition placeholder:text-muted focus:border-emerald-400/50';
+const inputClass = 'w-full rounded-xl border border-line bg-card-deep px-4 py-3 text-sm text-content outline-none transition placeholder:text-muted focus:border-orange-400/50';
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.2em] text-faint';
 
 function Settings() {
@@ -15,11 +17,17 @@ function Settings() {
   const { theme, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState('');
   const [profile, setProfile] = useState({ name: user?.name || '', email: user?.email || '' });
+  const [avatar, setAvatar] = useState(user?.avatar || null);
+  const [pendingAvatar, setPendingAvatar] = useState(null);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState(null);
   const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATIONS);
   const [password, setPassword] = useState({ current: '', next: '', confirm: '' });
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -31,6 +39,7 @@ function Settings() {
           name: data.user?.name || '',
           email: data.user?.email || '',
         });
+        setAvatar(data.user?.avatar || null);
         setNotifications({ ...DEFAULT_NOTIFICATIONS, ...(data.user?.preferences || {}) });
       })
       .catch((err) => {
@@ -47,6 +56,46 @@ function Settings() {
     setMessage(text);
     window.setTimeout(() => setMessage(null), 3000);
   };
+
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file');
+      return;
+    }
+    setPendingAvatar(URL.createObjectURL(file));
+    setPendingAvatarFile(file);
+    setError('');
+  };
+
+  const confirmAvatar = async () => {
+    if (!pendingAvatarFile) return;
+    setAvatarUploading(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('avatar', pendingAvatarFile);
+      const data = await api.put('/settings/me/avatar', formData);
+      setAvatar(data.user?.avatar || pendingAvatar);
+      resetPendingAvatar();
+      userStore.set({ ...user, avatar: data.user?.avatar || null });
+      showMessage('Profile photo updated');
+    } catch (err) {
+      setError(err.message || 'Failed to upload photo');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const resetPendingAvatar = () => {
+    if (pendingAvatar) URL.revokeObjectURL(pendingAvatar);
+    setPendingAvatar(null);
+    setPendingAvatarFile(null);
+  };
+
+  const avatarSrc = pendingAvatar || avatar || avatarImg;
 
   const saveProfile = async () => {
     setSaving(true);
@@ -106,9 +155,9 @@ function Settings() {
 
   return (
     <div className="relative min-h-screen bg-page text-content">
-      <div className="pointer-events-none absolute -right-40 top-0 h-[24rem] w-[24rem] rounded-full bg-emerald-500/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -right-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]" />
       <Sidebar />
-      <div className="relative ml-72 px-6 py-10 sm:px-8 lg:px-16">
+      <div className="relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 md:ml-72">
         <div className="mx-auto max-w-4xl space-y-6">
           <div>
             <BackButton />
@@ -120,7 +169,7 @@ function Settings() {
           </div>
 
           {message && (
-            <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-accent-soft">
+            <div className="rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-3 text-sm text-accent-soft">
               {message}
             </div>
           )}
@@ -144,23 +193,66 @@ function Settings() {
                   <button
                     onClick={saveProfile}
                     disabled={saving}
-                    className="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-line-strong disabled:text-muted"
+                    className="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-line-strong disabled:text-muted"
                   >
                     {saving ? 'Saving...' : 'Save changes'}
                   </button>
                 </div>
-                <div className="mt-6 flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-xl font-semibold text-accent-soft ring-1 ring-inset ring-emerald-400/30">
-                    {(profile.name || '?').charAt(0).toUpperCase()}
+                <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full ring-1 ring-inset ring-orange-400/30">
+                      <img
+                        src={avatarSrc}
+                        alt={`${profile.name || 'User'} profile photo`}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-semibold">{profile.name || 'Learner'}</h3>
+                      <p className="truncate text-sm text-muted">{profile.email || 'your@email.com'}</p>
+                      <span className="mt-2 inline-block rounded-full border border-orange-400/30 bg-orange-400/10 px-3 py-1 text-sm font-medium text-accent-soft">
+                        {roleLabel}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-semibold">{profile.name || 'Learner'}</h3>
-                    <p className="text-sm text-muted">{profile.email || 'your@email.com'}</p>
+                  <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+                    {pendingAvatar ? (
+                      <>
+                        <button
+                          onClick={confirmAvatar}
+                          disabled={avatarUploading}
+                          className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-line-strong disabled:text-muted"
+                        >
+                          {avatarUploading ? 'Uploading...' : 'Use this photo'}
+                        </button>
+                        <button
+                          onClick={resetPendingAvatar}
+                          disabled={avatarUploading}
+                          className="rounded-xl border border-line bg-card-deep px-4 py-2.5 text-sm font-semibold text-secondary transition hover:bg-card-hover disabled:cursor-not-allowed disabled:text-muted"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
+                          className="rounded-xl border border-line bg-card-deep px-4 py-2.5 text-sm font-semibold text-secondary transition hover:bg-card-hover"
+                        >
+                          Take photo
+                        </button>
+                        <button
+                          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                          className="rounded-xl border border-line bg-card-deep px-4 py-2.5 text-sm font-semibold text-secondary transition hover:bg-card-hover"
+                        >
+                          Upload from device
+                        </button>
+                      </>
+                    )}
                   </div>
-                  <span className="ml-auto rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-accent-soft">
-                    {roleLabel}
-                  </span>
                 </div>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="user" className="hidden" onChange={handleAvatarSelect} />
                 <div className="mt-8 grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className={labelClass} htmlFor="settings-name">Full name</label>
@@ -198,8 +290,8 @@ function Settings() {
                     onClick={() => theme !== 'dark' && toggleTheme()}
                     className={`flex items-center gap-4 rounded-2xl border p-5 text-left transition ${
                       theme === 'dark'
-                        ? 'border-emerald-400/50 bg-emerald-400/10'
-                        : 'border-line bg-card-deep hover:border-emerald-400/30 hover:bg-card-hover'
+                        ? 'border-orange-400/50 bg-orange-400/10'
+                        : 'border-line bg-card-deep hover:border-orange-400/30 hover:bg-card-hover'
                     }`}
                   >
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white ring-1 ring-inset ring-slate-700">
@@ -219,8 +311,8 @@ function Settings() {
                     onClick={() => theme !== 'light' && toggleTheme()}
                     className={`flex items-center gap-4 rounded-2xl border p-5 text-left transition ${
                       theme === 'light'
-                        ? 'border-emerald-400/50 bg-emerald-400/10'
-                        : 'border-line bg-card-deep hover:border-emerald-400/30 hover:bg-card-hover'
+                        ? 'border-orange-400/50 bg-orange-400/10'
+                        : 'border-line bg-card-deep hover:border-orange-400/30 hover:bg-card-hover'
                     }`}
                   >
                     <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 ring-1 ring-inset ring-amber-200">
@@ -260,7 +352,7 @@ function Settings() {
                         role="switch"
                         aria-checked={notifications[item.key]}
                         aria-label={item.title}
-                        className={`relative h-7 w-12 shrink-0 rounded-full transition ${notifications[item.key] ? 'bg-emerald-500' : 'bg-line-strong'}`}
+                        className={`relative h-7 w-12 shrink-0 rounded-full transition ${notifications[item.key] ? 'bg-orange-500' : 'bg-line-strong'}`}
                       >
                         <span
                           className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${notifications[item.key] ? 'left-[22px]' : 'left-0.5'}`}
@@ -278,9 +370,8 @@ function Settings() {
                 <div className="mt-6 grid gap-4 sm:grid-cols-3">
                   <div>
                     <label className={labelClass} htmlFor="settings-current-password">Current password</label>
-                    <input
+                    <PasswordInput
                       id="settings-current-password"
-                      type="password"
                       className={`${inputClass} mt-2`}
                       value={password.current}
                       onChange={(e) => setPassword((p) => ({ ...p, current: e.target.value }))}
@@ -288,9 +379,8 @@ function Settings() {
                   </div>
                   <div>
                     <label className={labelClass} htmlFor="settings-new-password">New password</label>
-                    <input
+                    <PasswordInput
                       id="settings-new-password"
-                      type="password"
                       className={`${inputClass} mt-2`}
                       value={password.next}
                       onChange={(e) => setPassword((p) => ({ ...p, next: e.target.value }))}
@@ -298,9 +388,8 @@ function Settings() {
                   </div>
                   <div>
                     <label className={labelClass} htmlFor="settings-confirm-password">Confirm new password</label>
-                    <input
+                    <PasswordInput
                       id="settings-confirm-password"
-                      type="password"
                       className={`${inputClass} mt-2`}
                       value={password.confirm}
                       onChange={(e) => setPassword((p) => ({ ...p, confirm: e.target.value }))}

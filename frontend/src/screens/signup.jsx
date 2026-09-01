@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../component/navigation.jsx';
 import Footer from '../component/footer.jsx';
+import PasswordInput from '../component/passwordInput.jsx';
+import { markNewUser } from '../component/sessionFlags.js';
 import api, { tokenStore, userStore } from '../api/client.js';
+import studyImg from '../assets/study.jpg';
 
 function Signup() {
   const [formData, setFormData] = useState({
@@ -49,6 +52,7 @@ function Signup() {
         throw new Error('Could not authenticate after signup.');
       }
       userStore.set(me.user);
+      markNewUser();
       navigate(me.user.role === 'instructor' ? '/instructorDashboard' : '/studentDashboard');
     } catch (error) {
       setIsError(true);
@@ -59,33 +63,45 @@ function Signup() {
   };
 
   const inputClass =
-    'w-full rounded-xl border border-line-strong bg-card-strong px-4 py-3 text-content placeholder:text-muted outline-none backdrop-blur-md transition focus:border-emerald-400/60 focus:bg-card-hover focus:ring-2 focus:ring-emerald-400/20';
+    'w-full rounded-xl border border-line-strong bg-card-strong px-4 py-3 text-content placeholder:text-muted outline-none backdrop-blur-md transition focus:border-orange-400/60 focus:bg-card-hover focus:ring-2 focus:ring-orange-400/20';
 
   return (
     <div className='min-h-screen bg-page text-content'>
       <div className='relative min-h-screen overflow-hidden'>
-        <div className='pointer-events-none absolute -left-32 top-20 h-[26rem] w-[26rem] rounded-full bg-emerald-500/20 blur-[120px]' />
-        <div className='pointer-events-none absolute -right-32 bottom-10 h-[26rem] w-[26rem] rounded-full bg-teal-400/15 blur-[120px]' />
+        <div className='pointer-events-none absolute inset-0 bg-dot-grid opacity-50' />
 
-        <Navbar />
+        <Navbar landing />
 
         <div className='relative mx-auto flex max-w-7xl flex-col items-center gap-10 px-6 pb-24 pt-36 sm:px-8 lg:flex-row lg:justify-between lg:px-16'>
           <div className='max-w-xl text-center lg:text-left'>
             <p className='mb-4 inline-flex items-center gap-2 rounded-full border border-line-strong bg-card-strong px-4 py-2 text-sm font-medium text-accent-soft backdrop-blur-md'>
-              <span className='h-2 w-2 rounded-full bg-emerald-400' />
+              <span className='h-2 w-2 rounded-full bg-orange-400' />
               Join EduFlow
             </p>
-            <h1 className='font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl'>
+            <h1 className='tracking-display font-display text-4xl font-medium leading-[1.05] sm:text-5xl'>
               Create your account and start learning with confidence.
             </h1>
             <p className='mt-6 text-lg leading-8 text-muted'>
               Access curated courses, track your progress, and connect with instructors in one place.
             </p>
+
+            <figure className='border-line-strong shadow-panel mt-10 hidden overflow-hidden border bg-page-solid lg:block'>
+              <img
+                src={studyImg}
+                alt='Student studying with an open notebook and laptop'
+                className='aspect-[4/3] w-full object-cover'
+                loading='lazy'
+              />
+              <figcaption className='rule-h-strong flex items-center justify-between gap-3 px-6 py-4 text-xs font-medium uppercase tracking-[0.2em] text-faint'>
+                <span>Start your semester</span>
+                <span className='text-accent'>EduFlow</span>
+              </figcaption>
+            </figure>
           </div>
 
-          <div className='w-full max-w-md rounded-3xl border border-line-strong bg-card p-8 shadow-2xl backdrop-blur-xl sm:p-10'>
+          <div className='shadow-panel w-full max-w-md rounded-3xl border border-line-strong bg-page-solid p-8 sm:p-10'>
             <p className='text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid'>Get started</p>
-            <h2 className='font-display mt-3 text-3xl font-semibold tracking-tight'>Sign up</h2>
+            <h2 className='tracking-display font-display mt-3 text-3xl font-medium sm:text-4xl'>Sign up</h2>
             <p className='mt-3 text-sm leading-6 text-muted'>
               Start your learning journey in just a few steps.
             </p>
@@ -127,15 +143,14 @@ function Signup() {
                 <label className='mb-1.5 block text-sm font-medium text-secondary' htmlFor='password'>
                   Password
                 </label>
-                <input
-                  id='password'
-                  name='password'
-                  type='password'
+                <PasswordInput
+                  id="password"
+                  name="password"
                   value={formData.password}
                   onChange={handleChange}
                   required
                   className={inputClass}
-                  placeholder='Create a password'
+                  placeholder="Create a password"
                 />
               </div>
 
@@ -143,15 +158,14 @@ function Signup() {
                 <label className='mb-1.5 block text-sm font-medium text-secondary' htmlFor='confirmPassword'>
                   Confirm password
                 </label>
-                <input
-                  id='confirmPassword'
-                  name='confirmPassword'
-                  type='password'
+                <PasswordInput
+                  id="confirmPassword"
+                  name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required
                   className={inputClass}
-                  placeholder='Re-enter your password'
+                  placeholder="Re-enter your password"
                 />
               </div>
 
@@ -174,7 +188,7 @@ function Signup() {
               <button
                 type='submit'
                 disabled={loading}
-                className='w-full rounded-xl bg-white px-4 py-3 font-semibold text-slate-900 shadow-xl shadow-emerald-500/10 transition hover:bg-emerald-100 disabled:opacity-60'
+                className='w-full rounded-xl bg-[var(--accent)] px-4 py-3 font-semibold text-[var(--page)] shadow-xl shadow-orange-500/20 transition hover:opacity-90 disabled:opacity-60'
               >
                 {loading ? 'Creating account...' : 'Create account'}
               </button>
@@ -185,7 +199,7 @@ function Signup() {
                 className={`mt-6 rounded-xl border px-4 py-3 text-sm backdrop-blur-md ${
                   isError
                     ? 'border-red-400/30 bg-red-500/10 text-danger'
-                    : 'border-emerald-400/30 bg-emerald-500/10 text-accent-soft'
+                    : 'border-orange-400/30 bg-orange-500/10 text-accent-soft'
                 }`}
               >
                 {message}

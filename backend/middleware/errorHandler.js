@@ -42,6 +42,14 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Multer upload errors (e.g. file too large)
+  if (err.name === 'MulterError' || err.code === 'LIMIT_FILE_SIZE') {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'File is too large. Please upload a smaller file.'
+      : err.message;
+    return res.status(400).json({ message });
+  }
+
   // Default error
   res.status(err.statusCode || 500).json({
     message: err.message || 'Internal Server Error',

@@ -7,6 +7,7 @@ const {
   getInstructorDashboard,
   getAdminDashboard
 } = require('../controllers/reportController');
+const { getCourseConsistency } = require('../controllers/activityController');
 const auth = require('../middleware/auth');
 const { isInstructorOrAdmin, isAdmin } = require('../middleware/rbac');
 
@@ -14,6 +15,7 @@ const { isInstructorOrAdmin, isAdmin } = require('../middleware/rbac');
 router.get('/courses/:courseId/enrollment', auth, isInstructorOrAdmin, getEnrollmentReport);
 router.get('/courses/:courseId/progress', auth, isInstructorOrAdmin, getProgressReport);
 router.get('/courses/:courseId/participation', auth, isInstructorOrAdmin, getParticipationReport);
+router.get('/courses/:courseId/consistency', auth, isInstructorOrAdmin, getCourseConsistency);
 router.get('/instructor/dashboard', auth, isInstructorOrAdmin, getInstructorDashboard);
 
 // Admin only routes

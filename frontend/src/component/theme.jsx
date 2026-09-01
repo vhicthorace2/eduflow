@@ -6,14 +6,14 @@ const THEME_KEY = 'eduflow_theme';
 function getInitialTheme() {
   const stored = localStorage.getItem(THEME_KEY);
   if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  return 'light';
 }
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(getInitialTheme);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('light', theme === 'light');
+    document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
@@ -30,10 +30,10 @@ function ThemeToggle({ light }) {
   const { theme, toggleTheme } = useTheme();
 
   const base = theme === 'light'
-    ? `rounded-full border border-slate-300 bg-slate-900 p-2 text-white shadow-lg transition hover:bg-slate-800${light ? ' backdrop-blur-md' : ''}`
+    ? `rounded-full border border-slate-300 bg-slate-900 p-2.5 text-white shadow-lg transition hover:bg-slate-800${light ? ' backdrop-blur-md' : ''}`
     : light
-      ? 'rounded-full border border-white/15 bg-white/10 p-2 text-white backdrop-blur-md transition hover:bg-white/20'
-      : 'rounded-full border border-line-strong bg-card-strong p-2 text-secondary transition hover:bg-card-hover';
+      ? 'rounded-full border border-white/15 bg-white/10 p-2.5 text-white backdrop-blur-md transition hover:bg-white/20'
+      : 'rounded-full border border-line-strong bg-card-strong p-2.5 text-secondary transition hover:bg-card-hover';
 
   return (
     <button

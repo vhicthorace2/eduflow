@@ -1,5 +1,7 @@
 const User = require('../models/User');
+const Course = require('../models/Course');
 const { Op } = require('sequelize');
+const { likeContains } = require('../utils/search');
 
 /**
  * Get all users (admin only)
@@ -13,8 +15,8 @@ exports.getAllUsers = async (req, res, next) => {
     if (role) where.role = role;
     if (search) {
       where[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { email: { [Op.like]: `%${search}%` } }
+        likeContains('name', search),
+        likeContains('email', search)
       ];
     }
 
@@ -183,6 +185,116 @@ exports.toggleUserStatus = async (req, res, next) => {
         name: user.name,
         email: user.email,
         isActive: user.isActive
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get all courses including inactive (admin only)
+ * @route GET /api/admin/courses
+ */
+exports.getAllCoursesAdmin = async (req, res, next) => {
+  try {
+    const { search } = req.query;
+
+    let where = {};
+    if (search) {
+      where[Op.or] = [
+        likeContains('title', search),
+        likeContains('description', search)
+      ];
+    }
+
+    const courses = await Course.findAll({
+      where,
+      include: [{
+        model: User,
+        as: 'instructor',
+        attributes: ['id', 'name', 'email']
+      }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.status(200).json({
+      success: true,
+      count: courses.length,
+      courses
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Assign a course to an instructor (admin only)
+ * @route PUT /api/admin/courses/:id/assign
+ */
+exports.assignInstructor = async (req, res, next) => {
+  try {
+    const course = await Course.findByPk(req.params.id);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    const { instructorId } = req.body;
+    if (!instructorId) {
+      return res.status(400).json({ message: 'instructorId is required' });
+    }
+
+    const instructor = await User.findByPk(instructorId);
+    if (!instructor) {
+      return res.status(404).json({ message: 'Instructor not found' });
+    }
+
+    if (!['instructor', 'lecturer'].includes(instructor.role)) {
+      return res.status(400).json({ message: 'Target user is not an instructor' });
+    }
+
+    course.instructorId = instructor.id;
+    await course.save();
+
+    const updated = await Course.findByPk(course.id, {
+      include: [{
+        model: User,
+        as: 'instructor',
+        attributes: ['id', 'name', 'email']
+      }]
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Course assigned to ${instructor.name}`,
+      course: updated
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Activate/deactivate a course (admin only)
+ * @route PUT /api/admin/courses/:id/status
+ */
+exports.toggleCourseStatus = async (req, res, next) => {
+  try {
+    const course = await Course.findByPk(req.params.id);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    course.isActive = !course.isActive;
+    await course.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Course ${course.isActive ? 'activated' : 'deactivated'} successfully`,
+      course: {
+        id: course.id,
+        title: course.title,
+        isActive: course.isActive
       }
     });
   } catch (error) {

@@ -3,15 +3,20 @@ import { useState } from 'react';
 import { tokenStore, userStore } from '../api/client.js';
 import ThemeToggle from './theme.jsx';
 
-const navItems = [
-  { to: '/', label: 'Home' },
-  { to: '/courses', label: 'Courses' },
-  { to: '/profile', label: 'Profile' },
-];
+const dashboardFor = (role) => {
+  if (role === 'admin') return '/adminDashboard';
+  if (role === 'instructor' || role === 'lecturer') return '/instructorDashboard';
+  return '/studentDashboard';
+};
 
 function Navbar({ landing }) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+
+  const navItems = [
+    { to: tokenStore.get() ? dashboardFor(userStore.get()?.role) : '/', label: 'Home' },
+    { to: '/courses', label: 'Courses' },
+  ];
 
   const handleSignOut = () => {
     tokenStore.clear();
@@ -60,7 +65,7 @@ function Navbar({ landing }) {
               </NavLink>
               <NavLink
                 to='/signup'
-                className='rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-emerald-100'
+                className='rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-[var(--page)] shadow-lg transition hover:opacity-90'
               >
                 Get Started
               </NavLink>
@@ -84,7 +89,7 @@ function Navbar({ landing }) {
           {!landing && !tokenStore.get() && (
             <NavLink
               to='/signup'
-              className='rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-emerald-100'
+              className='rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-[var(--page)] shadow-lg transition hover:opacity-90'
             >
               Get Started
             </NavLink>
@@ -97,7 +102,7 @@ function Navbar({ landing }) {
             onClick={() => setIsOpen((open) => !open)}
             aria-label='Toggle menu'
             aria-expanded={isOpen}
-            className='rounded-xl border border-line-strong bg-card-strong p-2 text-content backdrop-blur-md transition hover:bg-card-hover'
+            className='flex items-center justify-center rounded-xl border border-line-strong bg-card-strong p-3 text-content backdrop-blur-md transition hover:bg-card-hover'
           >
             <svg className='h-5 w-5' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'>
               {isOpen ? (
@@ -136,7 +141,7 @@ function Navbar({ landing }) {
                 <NavLink
                   to='/signup'
                   onClick={() => setIsOpen(false)}
-                  className='mt-1 rounded-xl bg-white px-4 py-3 text-center text-sm font-semibold text-slate-900 transition hover:bg-emerald-100'
+                  className='mt-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-[var(--page)] transition hover:opacity-90'
                 >
                   Get Started
                 </NavLink>
@@ -155,7 +160,7 @@ function Navbar({ landing }) {
               <NavLink
                 to={!tokenStore.get() ? '/signup' : '/login'}
                 onClick={() => setIsOpen(false)}
-                className='mt-1 rounded-xl bg-white px-4 py-3 text-center text-sm font-semibold text-slate-900 transition hover:bg-emerald-100'
+                className='mt-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-[var(--page)] transition hover:opacity-90'
               >
                 Get Started
               </NavLink>

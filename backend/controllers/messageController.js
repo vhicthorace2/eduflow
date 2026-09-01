@@ -3,6 +3,51 @@ const User = require('../models/User');
 const { Op } = require('sequelize');
 
 /**
+ * Directory of users the current user can message.
+ * Excludes the current user, admins, and inactive users.
+ * Supports an optional search query across name/email and an optional
+ * role filter (student/instructor/lecturer).
+ * @route GET /api/messages/users
+ */
+exports.getUsers = async (req, res, next) => {
+  try {
+    const { search, role } = req.query;
+
+    const where = {
+      id: { [Op.ne]: req.user.id },
+      isActive: true,
+      role: { [Op.ne]: 'admin' }
+    };
+
+    if (role && ['student', 'instructor', 'lecturer'].includes(role)) {
+      where.role = role;
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = `%${search.trim()}%`;
+      where[Op.or] = [
+        { name: { [Op.like]: term } },
+        { email: { [Op.like]: term } }
+      ];
+    }
+
+    const users = await User.findAll({
+      where,
+      attributes: ['id', 'name', 'email', 'role', 'avatar'],
+      order: [['name', 'ASC']]
+    });
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      users
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Get all messages for current user (sent and received)
  * @route GET /api/messages
  */

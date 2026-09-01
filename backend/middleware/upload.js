@@ -41,7 +41,9 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only images, PDFs, documents, and media files are allowed.'), false);
+    const err = new Error('Invalid file type. Only images, PDFs, documents, and media files are allowed.');
+    err.statusCode = 400;
+    cb(err, false);
   }
 };
 
@@ -54,4 +56,26 @@ const upload = multer({
   }
 });
 
+// Image-only uploader for profile photos
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+const imageFilter = (req, file, cb) => {
+  if (IMAGE_MIME_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    const err = new Error('Invalid file type. Only JPEG, PNG, GIF, or WebP images are allowed.');
+    err.statusCode = 400;
+    cb(err, false);
+  }
+};
+
+const uploadAvatar = multer({
+  storage: storage,
+  fileFilter: imageFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB max for profile photos
+  }
+});
+
 module.exports = upload;
+module.exports.uploadAvatar = uploadAvatar;

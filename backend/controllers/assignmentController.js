@@ -2,6 +2,7 @@ const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Course = require('../models/Course');
 const User = require('../models/User');
+const ActivityLog = require('../models/ActivityLog');
 
 /**
  * Get all assignments for a course
@@ -209,6 +210,13 @@ exports.submitAssignment = async (req, res, next) => {
       files,
       comments,
       isLate
+    });
+
+    await ActivityLog.create({
+      studentId: req.user.id,
+      courseId: assignment.courseId,
+      activityType: 'assignment_submit',
+      performedAt: new Date()
     });
 
     res.status(201).json({

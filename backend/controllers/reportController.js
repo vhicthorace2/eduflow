@@ -5,6 +5,7 @@ const Submission = require('../models/Submission');
 const QuizAttempt = require('../models/QuizAttempt');
 const Assignment = require('../models/Assignment');
 const Quiz = require('../models/Quiz');
+const Enrollment = require('../models/Enrollment');
 const { Op } = require('sequelize');
 
 /**
@@ -173,6 +174,21 @@ exports.getInstructorDashboard = async (req, res, next) => {
     const courses = await Course.findAll({ where: { instructorId: req.user.id } });
     const courseIds = courses.map(c => c.id);
 
+    // Real enrollment counts now that the Enrollment junction table exists
+    const enrollments = courseIds.length > 0
+      ? await Enrollment.findAll({
+          where: { courseId: { [Op.in]: courseIds } },
+          attributes: ['courseId', 'studentId']
+        })
+      : [];
+
+    const studentsByCourse = {};
+    enrollments.forEach((enrollment) => {
+      if (!studentsByCourse[enrollment.courseId]) studentsByCourse[enrollment.courseId] = 0;
+      studentsByCourse[enrollment.courseId] += 1;
+    });
+    const totalStudents = new Set(enrollments.map((e) => e.studentId)).size;
+
     // Get recent submissions
     const recentSubmissions = await Submission.findAll({
       where: { courseId: { [Op.in]: courseIds } },
@@ -214,14 +230,14 @@ exports.getInstructorDashboard = async (req, res, next) => {
     const dashboard = {
       summary: {
         totalCourses: courses.length,
-        totalStudents: 0, // Requires junction table
+        totalStudents,
         totalAssignments: await Assignment.count({ where: { courseId: { [Op.in]: courseIds } } }),
         totalQuizzes: await Quiz.count({ where: { courseId: { [Op.in]: courseIds } } })
       },
       courses: courses.map(course => ({
         id: course.id,
         title: course.title,
-        enrolledStudents: 0, // Requires junction table
+        enrolledStudents: studentsByCourse[course.id] || 0,
         isActive: course.isActive
       })),
       recentActivity: {

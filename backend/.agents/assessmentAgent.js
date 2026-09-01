@@ -65,6 +65,78 @@ const courseBanks = {
     { question: 'Which SQL command retrieves data from a table?', options: ['SELECT', 'UPDATE', 'DELETE', 'INSERT'], correctAnswer: 'SELECT' },
     { question: 'Which ACID property guarantees all-or-nothing execution?', options: ['Atomicity', 'Consistency', 'Isolation', 'Durability'], correctAnswer: 'Atomicity' },
     { question: 'A committed transaction is guaranteed to survive a crash by the...', options: ['Durability property', 'Join clause', 'Index cache', 'Foreign key'], correctAnswer: 'Durability property' }
+  ],
+  'soe 504 (fault tolerant computing)': [
+    { question: 'Which term describes an actual defect in a component, such as a bug or failing disk?', options: ['A fault', 'An error', 'A failure', 'An incident'], correctAnswer: 'A fault' },
+    { question: 'Keeping extra copies of critical resources so a failure is invisible is called...', options: ['redundancy', 'deployment', 'caching', 'load balancing'], correctAnswer: 'redundancy' },
+    { question: 'Triple modular redundancy (TMR) runs three identical units through a...', options: ['majority voter', 'round-robin scheduler', 'single dispatcher', 'checksum adder'], correctAnswer: 'majority voter' },
+    { question: 'Which technique detects corruption by comparing a small summary against the data block?', options: ['checksum', 'heartbeat', 'watchdog', 'voting'], correctAnswer: 'checksum' },
+    { question: 'A periodic "I am alive" message between components is a...', options: ['heartbeat', 'checksum', 'deadlock', 'handshake'], correctAnswer: 'heartbeat' },
+    { question: 'Which consensus algorithm elects a leader and commits entries with majority votes?', options: ['Raft', 'AJAX', 'Bloom', 'CRC'], correctAnswer: 'Raft' },
+    { question: 'A circuit breaker used in fault-tolerant design will...', options: ['trip after repeated failures', 'duplicate the database', 'encrypt every request', 'never allow retries'], correctAnswer: 'trip after repeated failures' },
+    { question: 'Bounding how long a slow component may delay a request is handled by...', options: ['timeouts', 'checksums', 'subnetting', 'minification'], correctAnswer: 'timeouts' },
+    { question: 'Losing functionality instead of everything on failure is called...', options: ['graceful degradation', 'bootstrapping', 'normalization', 'encapsulation'], correctAnswer: 'graceful degradation' },
+    { question: 'When two replicas disagree and no majority exists, the system can only...', options: ['detect the fault, not mask it', 'mask the fault silently', 'speed up both', 'drop the network'], correctAnswer: 'detect the fault, not mask it' }
+  ],
+  'soe 506 (game design and development unity)': [
+    { question: 'Everything in a Unity scene is a...', options: ['GameObject', 'Component', 'Prefab', 'Material'], correctAnswer: 'GameObject' },
+    { question: 'Which method does Unity call once per frame for game logic?', options: ['Update', 'Awake', 'Start', 'OnDestroy'], correctAnswer: 'Update' },
+    { question: 'A reusable template of a GameObject saved for reuse is a...', options: ['prefab', 'scene', 'collider', 'shader'], correctAnswer: 'prefab' },
+    { question: 'Which component gives a GameObject physics behavior?', options: ['Rigidbody', 'Camera', 'AudioSource', 'Canvas'], correctAnswer: 'Rigidbody' },
+    { question: 'A collider with "Is Trigger" enabled fires...', options: ['OnTriggerEnter', 'OnCollisionStay', 'OnMouseDown', 'OnDisable'], correctAnswer: 'OnTriggerEnter' },
+    { question: 'Which C# class do Unity game scripts derive from?', options: ['MonoBehaviour', 'ComponentBase', 'Transform', 'BehaviourCore'], correctAnswer: 'MonoBehaviour' },
+    { question: 'Which window is used to export the game for a target platform?', options: ['Build Settings', 'Inspector', 'Projection', 'Profiler'], correctAnswer: 'Build Settings' },
+    { question: 'Adding particles, screenshake, and flash on events is called...', options: ['juice', 'physics', 'voxelization', 'compiling'], correctAnswer: 'juice' },
+    { question: 'Which component defines the shape used for collision detection?', options: ['Collider', 'Rigidbody', 'Light', 'MeshFilter'], correctAnswer: 'Collider' },
+    { question: 'Which loop is best for physics-driven movement?', options: ['FixedUpdate', 'Update', 'LateUpdate', 'OnGUI'], correctAnswer: 'FixedUpdate' }
+  ],
+  'soe 508 (special topics in software engineering)': [
+    { question: 'Which architectural style builds an app from small, independently deployable services?', options: ['microservices', 'layered monolith', 'peer-to-peer', 'server farm'], correctAnswer: 'microservices' },
+    { question: 'In microservices, each service should own its...', options: ['own data store', 'own monolith', 'entire frontend', 'compiler'], correctAnswer: 'own data store' },
+    { question: 'A pipeline that runs tests on every merge is called...', options: ['continuous integration', 'feature branching', 'capacity planning', 'manual review'], correctAnswer: 'continuous integration' },
+    { question: 'Shipping changes to production automatically on every green build is...', options: ['continuous deployment', 'major release', 'hot patching', 'scheduled downtime'], correctAnswer: 'continuous deployment' },
+    { question: 'Defining servers and networks in code is called...', options: ['infrastructure as code', 'data mining', 'virtual memory', 'type checking'], correctAnswer: 'infrastructure as code' },
+    { question: 'A container packages code with its...', options: ['runtime and dependencies', 'entire hard drive', 'network switch', 'graphics card'], correctAnswer: 'runtime and dependencies' },
+    { question: 'Which orchestrator schedules containers across a cluster?', options: ['Kubernetes', 'Figma', 'Webpack', 'Git'], correctAnswer: 'Kubernetes' },
+    { question: 'Setting configuration from environment variables follows the...', options: ['twelve-factor principles', 'SOLID acronym', 'DRY doctrine', 'CAP theorem'], correctAnswer: 'twelve-factor principles' },
+    { question: 'Before defending a system you should first...', options: ['model the threats', 'disable the firewall', 'ship to production', 'delete the logs'], correctAnswer: 'model the threats' },
+    { question: 'Passwords in a secure application should be stored...', options: ['hashed with a salt', 'as plain text', 'in the frontend', 'base64 encoded'], correctAnswer: 'hashed with a salt' }
+  ],
+  'soe 510 (mobile app development using flutter)': [
+    { question: 'Which language does Flutter use to build apps?', options: ['Dart', 'Java', 'Kotlin', 'Swift'], correctAnswer: 'Dart' },
+    { question: 'In Flutter, everything you build on screen is a...', options: ['widget', 'view controller', 'fragment', 'canvas'], correctAnswer: 'widget' },
+    { question: 'Which widget manages the app bar, body, and main layout?', options: ['Scaffold', 'Container', 'Stack', 'Flexbox'], correctAnswer: 'Scaffold' },
+    { question: 'A widget that owns mutable state and rebuilds on change is a...', options: ['StatefulWidget', 'StatelessWidget', 'InheritedCall', 'FutureBuilder'], correctAnswer: 'StatefulWidget' },
+    { question: 'Which layout widget arranges children horizontally?', options: ['Row', 'Column', 'Stack', 'WrapGrid'], correctAnswer: 'Row' },
+    { question: 'Arranging children vertically uses...', options: ['Column', 'Row', 'Card', 'ListSplit'], correctAnswer: 'Column' },
+    { question: 'Which package is the standard step up from setState for app-wide state?', options: ['Provider', 'HttpClient', 'Path_provider', 'Image_picker'], correctAnswer: 'Provider' },
+    { question: 'Key-value storage for small settings is provided by...', options: ['SharedPreferences', 'sqflite', 'Dio', 'firestore_dart'], correctAnswer: 'SharedPreferences' },
+    { question: 'Navigating to a new screen is done with...', options: ['Navigator.push', 'Container.show', 'setState.next', 'Material.launch'], correctAnswer: 'Navigator.push' },
+    { question: 'Which command produces a release Android app bundle?', options: ['flutter build appbundle', 'flutter test', 'flutter analyze', 'flutter clean'], correctAnswer: 'flutter build appbundle' }
+  ],
+  'soe 512 (embedded systems)': [
+    { question: 'A complete computer integrated onto a single chip is a...', options: ['microcontroller', 'supercomputer', 'mainframe', 'GPU cluster'], correctAnswer: 'microcontroller' },
+    { question: 'Which keyword tells the C compiler a value may change outside the program (hardware)?', options: ['volatile', 'static', 'const', 'inline'], correctAnswer: 'volatile' },
+    { question: 'Which component converts analog voltages into numbers on an MCU?', options: ['ADC', 'PWM', 'UART', 'DMA'], correctAnswer: 'ADC' },
+    { question: 'Pulse-width modulation controls average output by varying the...', options: ['duty cycle', 'humidity', 'bit depth', 'cache size'], correctAnswer: 'duty cycle' },
+    { question: 'Which serial bus uses two wires and device addresses to connect many peripherals?', options: ['I2C', 'PCIe', 'HDMI', 'SATA'], correctAnswer: 'I2C' },
+    { question: 'In real-time systems, a deadline that must never be missed is called...', options: ['hard real-time', 'soft real-time', 'best-effort', 'async'], correctAnswer: 'hard real-time' },
+    { question: 'A low-priority task delaying a high-priority one is known as...', options: ['priority inversion', 'deadlock', 'thrashing', 'segmentation'], correctAnswer: 'priority inversion' },
+    { question: 'The delay between an event and its handler running is called...', options: ['interrupt latency', 'bandwidth', 'propagation delay', 'round trip'], correctAnswer: 'interrupt latency' },
+    { question: 'A light-weight OS providing tasks, queues, and scheduling for MCUs is a...', options: ['RTOS', 'hypervisor', 'bootloader', 'kernel module'], correctAnswer: 'RTOS' },
+    { question: 'Heavy processing should never happen inside an...', options: ['interrupt service routine', 'main loop', 'init function', 'state machine'], correctAnswer: 'interrupt service routine' }
+  ],
+  'soe 514 (website app development using java)': [
+    { question: 'Which container runs a Java web application?', options: ['Tomcat', 'JUnit', 'Maven Central', 'Javadoc'], correctAnswer: 'Tomcat' },
+    { question: 'Which build tool is commonly used for Java projects?', options: ['Maven', 'Webpack', 'pip', 'Cargo'], correctAnswer: 'Maven' },
+    { question: 'JSP is used together with servlets mostly for...', options: ['rendering views', 'database replication', 'memory allocation', 'SSL termination'], correctAnswer: 'rendering views' },
+    { question: 'The MVC pattern splits an app into model, view, and...', options: ['controller', 'router core', 'compiler', 'cache'], correctAnswer: 'controller' },
+    { question: 'A @RestController in Spring Boot returns data such as...', options: ['JSON', 'bytecode', 'shell scripts', 'Docker images'], correctAnswer: 'JSON' },
+    { question: 'Which annotation marks a class as a JPA entity?', options: ['@Entity', '@HttpGet', '@Bean', '@Thread'], correctAnswer: '@Entity' },
+    { question: 'Extending which base interface gives you CRUD operations for free in Spring Data?', options: ['JpaRepository', 'ServletProvider', 'CrudBuilder', 'RestController'], correctAnswer: 'JpaRepository' },
+    { question: 'Which annotation wraps a method so changes commit or roll back together?', options: ['@Transactional', '@Scheduled', '@Deprecated', '@Override'], correctAnswer: '@Transactional' },
+    { question: 'Spring Security hashes passwords with...', options: ['BCrypt', 'MD5 only', 'base64', 'ROT13'], correctAnswer: 'BCrypt' },
+    { question: 'Which tool ships a Spring Boot app as a runnable jar?', options: ['Maven', 'JUnit', 'SonarQube', 'Mailman'], correctAnswer: 'Maven' }
   ]
 };
 

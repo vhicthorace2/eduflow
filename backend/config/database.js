@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { Sequelize } = require('sequelize');
+const { Sequelize, DataTypes } = require('sequelize');
 
 const dialect = (process.env.DB_DIALECT || 'mysql').toLowerCase();
 
@@ -58,7 +58,50 @@ const connectDB = async () => {
     }
 
     if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: true });
+      // SQLite has no real ALTER: sync({ alter: true }) recreates tables for any
+      // detected column diff, and Sequelize's DEFAULT string/number normalization
+      // never converges, so altered tables are rebuilt on every boot. Each
+      // interrupted rebuild leaves a populated `*_backup` table that crashes the
+      // next boot (UNIQUE constraint). Use create-only sync and clean any
+      // leftover backup tables; apply column changes via the idempotent seed.
+      if (dialect === 'sqlite') {
+        const [backupTables] = await sequelize.query(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%backup%'"
+        );
+        for (const row of backupTables) {
+          const escaped = String(row.name).replace(/"/g, '""');
+          await sequelize.query(`DROP TABLE IF EXISTS "${escaped}"`);
+        }
+      }
+      await sequelize.sync();
+
+      // Column migrations (create-only sync won't alter existing tables).
+      const queryInterface = sequelize.getQueryInterface();
+
+      const ensureColumn = async (table, column, columnDef) => {
+        try {
+          const tableInfo = await queryInterface.describeTable(table);
+          if (tableInfo && !tableInfo[column]) {
+            await queryInterface.addColumn(table, column, columnDef);
+          }
+        } catch (err) {
+          // Table may not exist yet; sync() will have created it with the column.
+          if (!/no such table|ER_NO_SUCH_TABLE/i.test(err.message)) throw err;
+        }
+      };
+
+      await ensureColumn('Quizzes', 'type', {
+        type: DataTypes.ENUM('quiz', 'test', 'exam'),
+        allowNull: false,
+        defaultValue: 'quiz'
+      });
+
+      await ensureColumn('ActivityLogs', 'timeSpent', {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+      });
+
       console.log('Database synchronized');
     }
   } catch (error) {

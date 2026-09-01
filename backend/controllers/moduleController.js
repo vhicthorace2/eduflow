@@ -70,13 +70,14 @@ exports.createModule = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized to create modules for this course' });
     }
 
-    const { title, description, order } = req.body;
+    const { title, description, order, content } = req.body;
 
     const module = await Module.create({
       title,
       description,
       courseId: req.params.courseId,
-      order: order || 0
+      order: order || 0,
+      content: content || ''
     });
 
     res.status(201).json({

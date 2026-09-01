@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import api, { userStore } from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
 import BackButton from '../component/backButton.jsx';
+import WelcomeHeading from '../component/welcomeHeading.jsx';
+import adminHeroImg from '../assets/admin-hero.jpg';
 
 function AdminDashboard() {
   const [dashboard, setDashboard] = useState(null);
@@ -41,37 +43,47 @@ function AdminDashboard() {
   ];
 
   const actions = [
-    { title: 'Manage Users', desc: 'Review and manage student and instructor accounts.', to: '/adminDashboard' },
-    { title: 'Manage Courses', desc: 'Oversee course creation and publication.', to: '/courses' },
+    { title: 'Manage Users', desc: 'Add, edit, and remove student and instructor accounts.', to: '/adminUsers' },
+    { title: 'Manage Courses', desc: 'Create courses, assign instructors, and control availability.', to: '/adminCourses' },
     { title: 'View Reports', desc: 'Platform analytics and activity reports.', to: '/adminDashboard' },
   ];
 
   return (
     <div className='relative min-h-screen bg-page text-content'>
-      <div className='pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-emerald-500/10 blur-[120px]' />
+      <div className='pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]' />
       <Sidebar />
-      <div className='relative ml-72 p-6 lg:p-8'>
+      <div className='relative p-6 pt-20 lg:p-8 md:pt-6 md:ml-72'>
         <div className='mx-auto max-w-7xl space-y-6'>
           <div className='flex justify-start'>
             <BackButton />
           </div>
           {/* Header */}
-          <header className='flex flex-col gap-4 rounded-2xl border border-line bg-card p-6 shadow-sm backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between'>
-            <div>
-              <p className='text-sm font-medium text-accent-mid'>Admin Dashboard</p>
-              <h1 className='font-display mt-2 text-2xl font-semibold tracking-tight'>
-                Welcome back, {user?.name || 'Admin'}
-              </h1>
-              <p className='mt-1 text-sm text-muted'>
-                Manage students, courses, and platform activity in one place.
-              </p>
+          <header className='shadow-panel relative overflow-hidden rounded-2xl border border-line bg-card p-6 sm:flex-row sm:items-center sm:justify-between'>
+            <img
+              src={adminHeroImg}
+              alt=""
+              aria-hidden="true"
+              className='absolute inset-0 h-full w-full object-cover opacity-20'
+              loading='lazy'
+            />
+            <div className='absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/40' aria-hidden='true' />
+            <div className='relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div>
+                <p className='text-sm font-medium text-accent-mid'>Admin Dashboard</p>
+                <h1 className='tracking-display font-display mt-2 text-2xl font-medium'>
+                  <WelcomeHeading name={user?.name || 'Admin'} />
+                </h1>
+                <p className='mt-1 text-sm text-muted'>
+                  Manage students, courses, and platform activity in one place.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/adminCourses')}
+                className='w-fit rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-[var(--page)] shadow-xl transition hover:-translate-y-0.5 hover:opacity-90'
+              >
+                Manage courses
+              </button>
             </div>
-            <button
-              onClick={() => navigate('/courses')}
-              className='w-fit rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-xl transition hover:-translate-y-0.5 hover:bg-emerald-100'
-            >
-              Manage courses
-            </button>
           </header>
 
           {error && (
@@ -108,7 +120,7 @@ function AdminDashboard() {
                   <h2 className='text-lg font-semibold'>User Distribution</h2>
                   <div className='mt-6 space-y-5'>
                     {[
-                      { label: 'Students', value: distribution.students || 0, pct: studentPct, bar: 'bg-emerald-400' },
+                      { label: 'Students', value: distribution.students || 0, pct: studentPct, bar: 'bg-orange-400' },
                       { label: 'Instructors', value: distribution.instructors || 0, pct: instructorPct, bar: 'bg-teal-400' },
                       { label: 'Admins', value: distribution.admins || 0, pct: adminPct, bar: 'bg-slate-300' },
                     ].map((row) => (
@@ -124,7 +136,7 @@ function AdminDashboard() {
                     ))}
                   </div>
                   <div className='mt-6 flex flex-wrap gap-4 border-t border-line pt-5'>
-                    <span className='rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-accent-soft'>
+                    <span className='rounded-full border border-orange-400/30 bg-orange-400/10 px-4 py-2 text-sm font-medium text-accent-soft'>
                       Students: {distribution.students || 0}
                     </span>
                     <span className='rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-2 text-sm font-medium text-info'>
@@ -166,7 +178,7 @@ function AdminDashboard() {
                   <button
                     key={action.title}
                     onClick={() => navigate(action.to)}
-                    className='group rounded-2xl border border-line bg-card p-6 text-left backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-emerald-400/30 hover:bg-card-hover'
+                    className='group rounded-2xl border border-line bg-card p-6 text-left backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-orange-400/30 hover:bg-card-hover'
                   >
                     <h3 className='font-semibold text-content'>{action.title}</h3>
                     <p className='mt-2 text-sm leading-6 text-muted'>{action.desc}</p>

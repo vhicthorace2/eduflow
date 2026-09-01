@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../component/navigation.jsx';
 import Footer from '../component/footer.jsx';
+import PasswordInput from '../component/passwordInput.jsx';
 import api, { tokenStore, userStore } from '../api/client.js';
+import studyImg from '../assets/study.jpg';
 
 function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -45,20 +47,20 @@ function Login() {
   };
 
   const inputClass =
-    'w-full rounded-xl border border-line-strong bg-card-strong px-4 py-3 text-content placeholder:text-muted outline-none backdrop-blur-md transition focus:border-emerald-400/60 focus:bg-card-hover focus:ring-2 focus:ring-emerald-400/20';
+    'w-full rounded-xl border border-line-strong bg-card-strong px-4 py-3 text-content placeholder:text-muted outline-none backdrop-blur-md transition focus:border-orange-400/60 focus:bg-card-hover focus:ring-2 focus:ring-orange-400/20';
 
   return (
     <div className='min-h-screen bg-page text-content'>
       <div className='relative min-h-screen overflow-hidden'>
-        <div className='pointer-events-none absolute -left-32 top-20 h-[26rem] w-[26rem] rounded-full bg-emerald-500/20 blur-[120px]' />
-        <div className='pointer-events-none absolute -right-32 bottom-10 h-[26rem] w-[26rem] rounded-full bg-teal-400/15 blur-[120px]' />
+        <div className='pointer-events-none absolute inset-0 bg-dot-grid opacity-50' />
 
-        <Navbar />
+      <Navbar landing />
 
-        <div className='relative mx-auto flex max-w-7xl flex-col items-center justify-center px-6 pb-24 pt-36 sm:px-8 lg:px-16'>
-          <div className='w-full max-w-md rounded-3xl border border-line-strong bg-card p-8 shadow-2xl backdrop-blur-xl sm:p-10'>
+        <div className='relative mx-auto grid max-w-7xl items-center gap-12 px-6 pb-24 pt-36 sm:px-8 lg:grid-cols-12 lg:gap-16 lg:px-16'>
+          <div className='lg:col-span-5'>
+            <div className='shadow-panel w-full max-w-md rounded-3xl border border-line-strong bg-page-solid p-8 sm:p-10'>
             <p className='text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid'>Welcome back</p>
-            <h1 className='font-display mt-3 text-3xl font-semibold tracking-tight'>Sign in to EduFlow</h1>
+            <h1 className='tracking-display font-display mt-3 text-3xl font-medium sm:text-4xl'>Sign in to EduFlow</h1>
             <p className='mt-3 text-sm leading-6 text-muted'>
               Access your courses, progress, and dashboard.
             </p>
@@ -84,22 +86,21 @@ function Login() {
                 <label className='mb-1.5 block text-sm font-medium text-secondary' htmlFor='password'>
                   Password
                 </label>
-                <input
-                  id='password'
-                  name='password'
-                  type='password'
+                <PasswordInput
+                  id="password"
+                  name="password"
                   value={formData.password}
                   onChange={handleChange}
                   required
                   className={inputClass}
-                  placeholder='Enter your password'
+                  placeholder="Enter your password"
                 />
               </div>
 
               <button
                 type='submit'
                 disabled={loading}
-                className='w-full rounded-xl bg-white px-4 py-3 font-semibold text-slate-900 shadow-xl shadow-emerald-500/10 transition hover:bg-emerald-100 disabled:opacity-60'
+                className='w-full rounded-xl bg-[var(--accent)] px-4 py-3 font-semibold text-[var(--page)] shadow-xl shadow-orange-500/20 transition hover:opacity-90 disabled:opacity-60'
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </button>
@@ -110,7 +111,7 @@ function Login() {
                 className={`mt-6 rounded-xl border px-4 py-3 text-sm backdrop-blur-md ${
                   isError
                     ? 'border-red-400/30 bg-red-500/10 text-danger'
-                    : 'border-emerald-400/30 bg-emerald-500/10 text-accent-soft'
+                    : 'border-orange-400/30 bg-orange-500/10 text-accent-soft'
                 }`}
               >
                 {message}
@@ -123,6 +124,22 @@ function Login() {
                 Create one
               </Link>
             </p>
+            </div>
+          </div>
+
+          <div className='hidden lg:col-span-7 lg:block'>
+            <figure className='border-line-strong shadow-panel overflow-hidden border bg-page-solid'>
+              <img
+                src={studyImg}
+                alt='Student studying at a desk filled with books and notes'
+                className='aspect-[4/3] w-full object-cover'
+                loading='lazy'
+              />
+              <figcaption className='rule-h-strong flex items-center justify-between gap-3 px-6 py-4 text-xs font-medium uppercase tracking-[0.2em] text-faint'>
+                <span>Learn at your own pace</span>
+                <span className='text-accent'>EduFlow</span>
+              </figcaption>
+            </figure>
           </div>
         </div>
       </div>

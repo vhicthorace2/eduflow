@@ -23,6 +23,11 @@ const Quiz = sequelize.define('Quiz', {
     allowNull: true,
     defaultValue: ''
   },
+  type: {
+    type: DataTypes.ENUM('quiz', 'test', 'exam'),
+    allowNull: false,
+    defaultValue: 'quiz'
+  },
   courseId: {
     type: DataTypes.INTEGER,
     allowNull: false,

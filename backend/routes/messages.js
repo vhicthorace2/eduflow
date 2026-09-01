@@ -7,12 +7,14 @@ const {
   replyToMessage,
   markAsRead,
   deleteMessage,
-  getUnreadCount
+  getUnreadCount,
+  getUsers
 } = require('../controllers/messageController');
 const auth = require('../middleware/auth');
 
 // Protected routes
 router.get('/', auth, getMessages);
+router.get('/users', auth, getUsers);
 router.get('/unread-count', auth, getUnreadCount);
 router.get('/:id', auth, getMessageById);
 router.post('/', auth, sendMessage);
