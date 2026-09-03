@@ -26,6 +26,7 @@ function StudentDashboard() {
   const [availableCourses, setAvailableCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState('courses');
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const [timeLeft, setTimeLeft] = useState(ASSESSMENT_TIME_LIMIT);
@@ -127,9 +128,18 @@ function StudentDashboard() {
   };
 
   const startAssessment = async () => {
-    setWizard((w) => ({ ...w, phase: 'questions', error: null }));
+    const course = wizard.course;
+    setWizard((w) => ({
+      ...w,
+      phase: 'questions',
+      error: null,
+      assessmentId: null,
+      questions: [],
+      answers: [],
+      result: null,
+    }));
     try {
-      const data = await api.post('/assessment/start', { course: wizard.course.title, courseId: wizard.course.id });
+      const data = await api.post('/assessment/start', { course: course.title, courseId: course.id });
       setWizard((w) => ({
         ...w,
         assessmentId: data.assessmentId,
@@ -137,7 +147,7 @@ function StudentDashboard() {
         answers: (data.questions || []).map(() => null),
       }));
     } catch (error) {
-      setWizard((w) => ({ ...w, error: error.message || 'Failed to start assessment' }));
+      setWizard((w) => ({ ...w, phase: 'intro', error: error.message || 'Failed to start assessment' }));
     }
   };
 
@@ -150,6 +160,8 @@ function StudentDashboard() {
   };
 
   const submitAssessment = async (assessmentId, answers) => {
+    if (submitting) return;
+    setSubmitting(true);
     setWizard((w) => ({ ...w, error: null }));
     try {
       const data = await api.post('/assessment/submit', {
@@ -161,6 +173,8 @@ function StudentDashboard() {
       setWizard((w) => ({ ...w, phase: 'result', result: data }));
     } catch (error) {
       setWizard((w) => ({ ...w, error: error.message || 'Failed to submit assessment' }));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -583,12 +597,14 @@ function StudentDashboard() {
 
                 <button
                   onClick={() => submitAssessment(wizard.assessmentId, wizard.answers)}
-                  disabled={answeredCount < wizard.questions.length || wizard.questions.length === 0}
+                  disabled={submitting || answeredCount < wizard.questions.length || wizard.questions.length === 0}
                   className="mt-8 w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-line-strong disabled:text-muted"
                 >
-                  {answeredCount < wizard.questions.length
-                    ? `Answer all questions to continue (${answeredCount}/${wizard.questions.length})`
-                    : 'Submit Assessment'}
+                  {submitting
+                    ? 'Submitting…'
+                    : answeredCount < wizard.questions.length
+                      ? `Answer all questions to continue (${answeredCount}/${wizard.questions.length})`
+                      : 'Submit Assessment'}
                 </button>
               </div>
             )}

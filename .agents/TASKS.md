@@ -10,6 +10,41 @@ When you start, finish, or reprioritize work, update this file.
 
 ## Completed
 
+### 2026-09-03 — Configure backend for hosted MySQL (TiDB Cloud Serverless on Vercel)
+- **Status:** completed
+- **Summary:** The backend already supported MySQL via `DB_DIALECT=mysql`. Prepared it for online hosting on
+  Vercel + a managed MySQL-compatible DB: create-only schema sync now runs in every environment (so a fresh
+  hosted DB gets its tables on first boot), and the connection pool is serverless-aware so many cold-start
+  instances don't exhaust the provider's socket limit.
+- **Details:**
+  - `backend/config/database.js`: moved plain `sequelize.sync()` + idempotent `ensureColumn` migrations out of
+    the dev-only gate so they run in production too (safe — plain sync only creates missing tables). Made the
+    SQLite backup-table cleanup dev-only. Pool: `DB_POOL_MAX` env, default `1` when `VERCEL=1`/`SERVERLESS=1`
+    (small for serverless) else `5`; shorter `acquire` on serverless.
+  - `backend/.env.example`: documented the production MySQL + serverless pooling vars and the provider mapping.
+- **Verified:** `node -c config/database.js` passes; backend boots and `GET /api/health` returns
+  `{ success: true }` with the refactored `connectDB`.
+- **Files:** `backend/config/database.js`, `backend/.env.example`
+- **Remaining (user-side):** create TiDB Serverless cluster, add its Vercel integration, set the
+  `DB_*`/`JWT_SECRET` env vars, and run `npm run db:seed` once against the hosted DB to load the catalog.
+
+### 2026-09-03 — Student dashboard: fix placement-assessment retake/stale-state bugs
+- **Status:** completed
+- **Summary:** Bug scan of `studentDashboard.jsx` (assessment wizard) found the retake flow kept stale
+  attempt data and a versioned timer; error path stranded the user in the questions phase; submit had no
+  double-fire guard.
+- **Details:**
+  - `startAssessment()` now clears `assessmentId/questions/answers/result` in the same update that sets
+    `phase:'questions'` (so retake shows a clean loading state and the timer starts only when the new
+    `assessmentId` arrives), and reverts to `phase:'intro'` on API failure so the user isn't stuck.
+  - Reads `wizard.course` into a local `const` before the async boundary.
+  - Added a `submitting` guard to `submitAssessment` (early-return + `finally` reset) and wired it into the
+    Submit button `disabled`/label to prevent double-submit.
+- **Verified:** `npm run lint` + `npm run build` green.
+- **Files:** `frontend/src/screens/studentDashboard.jsx`
+- **Deferred (tech debt):** N+1 `/modules/course/:id` calls, missing ARIA `tabpanel`/`aria-labelledby`
+  linkage, `Invalid Date` guard on `attempt.completedAt`, `enrolledIds` not memoized.
+
 ### 2026-08-31 — Student dashboard: section tabs (My Courses / Upcoming Tasks / Recent Results / Available Courses)
 - **Status:** completed
 - **Summary:** Converted the stacked content sections on the student dashboard into a tab bar so

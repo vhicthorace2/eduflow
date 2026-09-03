@@ -52,6 +52,26 @@ Format per entry:
 
 ## Database / Sequelize
 
+### 2026-09-03 — Serverless (Vercel) + MySQL: run create-only sync in prod and shrink the pool (deployment)
+- **What happened:** The app already selects MySQL via `DB_DIALECT=mysql`, but two things made "just flip the
+  env var" fail in production on Vercel: (1) `connectDB()` only ran `sequelize.sync()` when
+  `NODE_ENV === 'development'`, so a fresh hosted MySQL DB got **zero tables** (all queries failed); (2) the
+  pool was fixed at `max: 5`, so many serverless cold-start instances exhausted the provider's socket/connection
+  cap (TiDB Serverless free tier limits connections).
+- **Root cause:** Schema creation was gated behind a dev-only flag, and the pool was tuned for a few always-on
+  processes, not many ephemeral serverless ones.
+- **Fix / prevention:**
+  - Run plain `sequelize.sync()` (create-only; `CREATE TABLE IF NOT EXISTS`, never alters/drops) in **every**
+    environment, not just dev. Keep the SQLite backup-table cleanup dev-only. This is safe and idempotent — the
+    earlier lesson about sync being dangerous applies only to `{ alter: true }`, not plain sync.
+  - Size the pool from env: `DB_POOL_MAX`, defaulted small (1) when `process.env.VERCEL === '1'` (or
+    `SERVERLESS === '1'`), else 5; shorten `acquire` for serverless. Documented in `.env.example`.
+- **Files involved:** `backend/config/database.js`, `backend/.env.example`
+- **Provider note:** For a Vercel-hosted Sequelize/MySQL app, TiDB Cloud Serverless is the best fit in 2026
+  (MySQL-compatible, ~25 GiB free, scale-to-zero, first-party Vercel integration that injects `TIDB_HOST`/
+  `TIDB_PORT`/`TIDB_USER`/`TIDB_PASSWORD`/`TIDB_DATABASE`). PlanetScale removed its free tier in 2024 (~$40/mo
+  min), so it is no longer the default.
+
 ### 2026-08-18 — `%${x}%` Op.like lets user input act as SQL wildcards; escape + set Op.escape (SQL / LIKE injection)
 - **What happened:** A security pass found the backend insulated from classic raw-SQL injection (everything goes
   through the Sequelize query builder with parameterized values), but the `Op.like` search patterns
@@ -214,6 +234,21 @@ Format per entry:
   closes. Verify by running `npm run build` (vite transforms) or lint, which report the adjacent-JSX error for any
   unbalanced ancestor. Count container divs explicitly: one `<div className="rounded-3xl ...">` = exactly one
   `</div>`. Also keep the grid/`lg:grid-cols-2` results panel on a single wrapper.
+- **Files involved:** `frontend/src/screens/studentDashboard.jsx`
+
+### 2026-09-03 — "Retry"/"Retake" that reuses an assembled modal leaves stale wizard state (state reset on re-entry)
+- **What happened:** A placement-assessment wizard had a "Retake" button. `startAssessment()` did
+  `setWizard((w) => ({ ...w, phase: 'questions', error: null }))` — spreading the *current* state. On a
+  retake this kept the previous attempt's `questions`, `answers`, `assessmentId`, and `result` intact while
+  the new API call was in flight, so the user briefly saw stale questions/answers and the 120s timer started
+  on the old `assessmentId` (losing seconds). On API *failure* the phase stayed `'questions'` with empty
+  questions — the user was stuck.
+- **Root cause:** Any "re-start the same flow" handler that spreads existing modal state must explicitly null
+  out the fields the next phase depends on; otherwise the previous run's data persists across re-entry.
+- **Fix / prevention:** When re-invoking a flow on already-populated state, reset the transient fields in the
+  same update that changes `phase` (set `assessmentId/questions/answers/result` to empty/null), and on error
+  revert `phase` to `'intro'` so the user can retry cleanly. Add a `submitting` guard to async submit handlers
+  to prevent double-fire (check flag at entry, `finally` clears it).
 - **Files involved:** `frontend/src/screens/studentDashboard.jsx`
 
 ## Frontend / Integration
