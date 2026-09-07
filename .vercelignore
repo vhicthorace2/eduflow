@@ -1,0 +1,8 @@
+node_modules
+.agents
+.opencode
+.env
+.env.*
+!.env.example
+src
+*.log

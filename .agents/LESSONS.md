@@ -72,6 +72,21 @@ Format per entry:
   `TIDB_PORT`/`TIDB_USER`/`TIDB_PASSWORD`/`TIDB_DATABASE`). PlanetScale removed its free tier in 2024 (~$40/mo
   min), so it is no longer the default.
 
+### 2026-09-03 — Vercel monorepo (backend + frontend) needs a root workspaces package.json (deployment)
+- **What happened:** `vercel.json` already builds both apps (`backend/server.js` via `@vercel/node`,
+  `frontend/package.json` via `@vercel/static-build`, routes `/api/*` → backend, else static), but the repo had
+  **no root `package.json`** — only an empty root `package-lock.json` (`"packages": {}`). Vercel's default install
+  step at the repo root had nothing to install, so `node_modules` for `backend/` and `frontend/` were never
+  guaranteed at build time, and the shared/lockfile state was inconsistent.
+- **Root cause:** A monorepo without a root package manifest (or workspaces) gives Vercel no single source of
+  truth to install from and no way to capture a coherent lockfile.
+- **Fix / prevention:** Added root `package.json` with `"workspaces": ["backend", "frontend"]` and helper
+  scripts (`build`, `seed`, `dev:*`), then regenerated the root `package-lock.json` (`npm install
+  --package-lock-only`). `npm run build` at the root successfully runs the frontend prod build (vite → `dist`),
+  matching what `@vercel/static-build` consumes. For any multi-app repo deployed to Vercel from a single root,
+  give it a root workspace manifest + lockfile and keep a working `npm run build`.
+- **Files involved:** `package.json` (root, new), `package-lock.json` (root, regenerated)
+
 ### 2026-08-18 — `%${x}%` Op.like lets user input act as SQL wildcards; escape + set Op.escape (SQL / LIKE injection)
 - **What happened:** A security pass found the backend insulated from classic raw-SQL injection (everything goes
   through the Sequelize query builder with parameterized values), but the `Op.like` search patterns

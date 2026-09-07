@@ -10,6 +10,27 @@ When you start, finish, or reprioritize work, update this file.
 
 ## Completed
 
+### 2026-09-03 — Single-domain Vercel hosting: root workspaces package.json for backend + frontend
+- **Status:** completed
+- **Summary:** The repo already had `vercel.json` deploying both apps under one domain. Added the missing root
+  `package.json` with npm workspaces (`backend`, `frontend`) and regenerated the root `package-lock.json` so
+  Vercel can install all dependencies in one step and build both apps reliably from the repo root.
+- **Details:**
+  - Root `package.json`: `"workspaces": ["backend", "frontend"]` + scripts `build`, `seed`, `dev:backend`,
+    `dev:frontend`.
+  - Regenerated root `package-lock.json` (was an empty `"packages": {}` stub) and verified the `backend`/
+    `frontend` workspace entries are tracked.
+  - `npm run build` at the root runs the frontend prod build (vite → `dist/`) successfully — what
+    `@vercel/static-build` consumes (`distDir: dist`).
+- **Verified:** `npm run build` green at the repo root; lockfile tracks both workspaces.
+- **Files:** `package.json` (root, new), `package-lock.json` (root, regenerated), `vercel.json`,
+  `.vercelignore` (new), `backend/server.js`
+- **Follow-up:** Fixed `vercel.json` SPA fallback — final catch-all now serves `index.html` (was
+  `frontend/$1`, which 404'd on BrowserRouter deep links like `/login`, `/dashboard`, `/courses/:id` on
+  refresh), and added an `/uploads/(.*)` → backend route. JSON validated. Added `.vercelignore` (excludes
+  node_modules, .agents, .opencode, .env, stray empty `src/`) and a `VERCEL === '1'` guard in
+  `backend/server.js` so it exports the app without binding a port on serverless (local boot re-verified).
+
 ### 2026-09-03 — Configure backend for hosted MySQL (TiDB Cloud Serverless on Vercel)
 - **Status:** completed
 - **Summary:** The backend already supported MySQL via `DB_DIALECT=mysql`. Prepared it for online hosting on
