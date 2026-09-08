@@ -9,8 +9,7 @@
     },
     "backend": {
       "root": "backend/",
-      "framework": "express",
-      "entryPoint": "server.js"
+      "framework": "express"
     }
   },
   "rewrites": [
