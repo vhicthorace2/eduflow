@@ -15,7 +15,19 @@ Format per entry:
 
 ## Deployment / Vercel
 
-### 2026-09-07 — Unanchored `src` in `.vercelignore` deletes `frontend/src` at build time (deployment)
+### 2026-09-09 — Vercel "Redeploy" keeps the original commit; stale builds mask fixes (deployment)
+- **What happened:** Repeated deploy attempts failed with the exact same Vercel frontend
+  error even after fixes were committed and pushed. Build logs showed `Cloning ... Commit: 09e7d3e`
+  each time, while `origin/main` had moved forward.
+- **Root cause:** Clicking **Redeploy** on a previous deployment re-builds the *pinned commit* of
+  that deployment, not `main` HEAD. None of the fix commits were ever built, so the symptom never changed.
+- **Fix / prevention:** Verify the `Commit:` hash in the build log matches `origin/main` before
+  debugging further. After pushing fixes, either confirm an auto-deploy fired for the new hash, or
+  trigger a *fresh* deployment: Vercel dashboard → Deployments → **Create Deployment** (uses latest
+  commit) rather than Redeploy, or run `npx vercel --prod` from the repo root.
+- **Files involved:** n/a (process)
+
+### 2026-09-09 — Unanchored `src` in `.vercelignore` deletes `frontend/src` at build time (deployment)
 - **What happened:** Vercel build of the frontend service failed with
   `Failed to resolve /src/main.jsx from /vercel/path0/frontend/index.html`, `vite build` error with
   `Build failed in 38ms` and only 1 module transformed. Local `npm run build` worked fine.
