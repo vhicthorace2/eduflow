@@ -3,9 +3,7 @@
   "services": {
     "frontend": {
       "root": "frontend/",
-      "rewrites": [
-        { "source": "/(.*)", "destination": "/index.html" }
-      ]
+      "entrypoint": "/index.html"
     },
     "backend": {
       "root": "backend/",
