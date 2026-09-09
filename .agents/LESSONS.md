@@ -13,6 +13,37 @@ Format per entry:
 
 ---
 
+## Deployment / Vercel
+
+### 2026-09-07 — Unanchored `src` in `.vercelignore` deletes `frontend/src` at build time (deployment)
+- **What happened:** Vercel build of the frontend service failed with
+  `Failed to resolve /src/main.jsx from /vercel/path0/frontend/index.html`, `vite build` error with
+  `Build failed in 38ms` and only 1 module transformed. Local `npm run build` worked fine.
+- **Root cause:** `.vercelignore` contained a bare unanchored `src` pattern. Unanchored patterns match
+  at any directory depth, so Vercel pruned `frontend/src/` (main.jsx, all screens/components) before
+  staging the build. With the source gone, `index.html`'s `<script src="/src/main.jsx">` could not resolve.
+- **Fix / prevention:** Removed the stray `src` line from `.vercelignore`. Keep ignore patterns either
+  anchored (`/src`) to the repo root or specific to the intended path; verify each deployed service still
+  has its source tree by inspecting the "Removed N ignored files" list in build output when a build
+  unexpectedly loses files.
+- **Files involved:** `.vercelignore`
+
+## Serverless / API
+
+### 2026-09-07 — Vercel CLI 59 (services model) ignores legacy `builds`/`routes`; define services + entrypoint (deployment)
+- **What happened:** First build after the single-domain wiring failed:
+  `Error: Service "backend" detected framework "express" in "backend" and must specify an "entrypoint" for runtime "node".`
+  The legacy `builds`/`routes` platform keys are no longer honored by the services-based CLI; the backend workspace
+  is auto-detected as an Express service that requires an entrypoint file.
+- **Root cause:** The modern Vercel CLI builds per-workspace services from `services` in `vercel.json`, not from
+  the old `builds`+`routes` config. The Express service needs `entrypoint: "server.js"` (it already exports the app).
+- **Fix / prevention:** Declared `services` (`frontend` root `frontend/`, `backend` root `backend/`,
+  `framework: "express"`, `entrypoint: "server.js"`) plus top-level `rewrites` routing `/api/(.*)` and
+  `/uploads/(.*)` to the backend service and `/(.*)` to the frontend service. The frontend service carries its own
+  SPA `rewrites` (`/(.*)` → `/index.html`) for BrowserRouter. Keep the entrypoint set whenever the service is
+  detected (re-edits of `vercel.json` that drop it reintroduce the failure).
+- **Files involved:** `vercel.json`, `backend/server.js`
+
 ## Database / Sequelize
 
 ### 2026-08-16 — Create-only sync never alters existing tables; add columns via idempotent migration (schema evolution)
