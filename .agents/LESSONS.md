@@ -42,6 +42,25 @@ Format per entry:
 
 ## Serverless / API
 
+### 2026-09-15 — `fetch` building `/api${API_URL}` instead of `/api${path}` → every API call hits one URL → 405 (frontend)
+- **What happened:** All API requests started failing with **405 Method Not Allowed** across
+  unrelated endpoints (login, courses, quizzes). Frontend production build still succeeded.
+- **Root cause:** Commit `bd86c72` changed the request builder in
+  `frontend/src/api/client.js` from `fetch(\`/api${path}\`)` to
+  `fetch(\`/api${API_URL}\`)` where `API_URL = import.meta.env.VITE_API_URL` — an env var that
+  is never set in this repo. The `path` argument (e.g. `/courses`, `/auth/login`) was silently
+  dropped, so every request in the app went to the same literal URL; requests whose method did
+  not match the backend route's method (e.g. POST vs GET) returned 405. The same commit also
+  leaked `import.meta.env.VITE_API_URL` into CommonJS `backend/server.js` (later reverted).
+- **Fix / prevention:** `const API_URL = import.meta.env.VITE_API_URL || '';` and
+  `fetch(\`${API_URL}/api${path}\`)` — path is respected, and `VITE_API_URL` stays an optional
+  absent-by-default prefix. Cross-checked all 65 frontend `api.*` call sites against the backend
+  `routes/*` mounts; every URL now resolves to a real, method-correct route. When adding a new
+  screen, verify its `api.*` paths/methods against `backend/routes/*` (one file per resource).
+- **Files involved:** `frontend/src/api/client.js`, `backend/server.js`
+
+## Serverless / API
+
 ### 2026-09-07 — Vercel CLI 59 (services model) ignores legacy `builds`/`routes`; define services + entrypoint (deployment)
 - **What happened:** First build after the single-domain wiring failed:
   `Error: Service "backend" detected framework "express" in "backend" and must specify an "entrypoint" for runtime "node".`
