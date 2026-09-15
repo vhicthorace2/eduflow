@@ -6,7 +6,6 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { connectDB } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
-const API_URL = import.meta.env.VITE_API_URL;
 
 // Initialize models and associations
 require('./models');
