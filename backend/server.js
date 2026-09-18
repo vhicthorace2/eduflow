@@ -34,9 +34,34 @@ const app = express();
 app.use(helmet());
 
 // CORS middleware
+const normalizeOrigin = (value) => {
+  const trimmed = String(value || '').trim().replace(/\/+$/, '');
+  if (!trimmed || trimmed === '*') return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return /^localhost(:\d+)?$/i.test(trimmed) ? `http://${trimmed}` : `https://${trimmed}`;
+};
+
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.CLIENT_URLS,
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URLS,
+  process.env.CORS_ORIGIN,
+  process.env.CORS_ORIGINS
+]
+  .filter(Boolean)
+  .flatMap((value) => String(value).split(','))
+  .map(normalizeOrigin)
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || '*',
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (!allowedOrigins.length || allowedOrigins.includes('*')) return callback(null, true);
+    return callback(null, allowedOrigins.includes(normalizeOrigin(origin)));
+  },
+  credentials: true,
+  optionsSuccessStatus: 204
 }));
 
 // Compression middleware

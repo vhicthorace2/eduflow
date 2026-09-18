@@ -42,6 +42,26 @@ Format per entry:
 
 ## Serverless / API
 
+### 2026-09-18 — Invalid CORS header returned in prod because the fix was never deployed to the service the frontend calls (CORS / deployment)
+- **What happened:** Login failed in production with `TypeError: Failed to fetch`. The frontend (Vercel, `eduflow-backend-ca1q.vercel.app`) was built with `VITE_API_URL=https://eduflow-7dp7.onrender.com`, so the login POST goes cross-origin to the Render backend. Simulated preflight: `OPTIONS /api/auth/login` with `Origin: https://eduflow-backend-ca1q.vercel.app` returned `Access-Control-Allow-Origin: eduflow-backend-ca1q.vercel.app` — a bare domain with **no scheme**, which the CORS spec rejects, so the browser never sends the POST and `fetch` throws "Failed to fetch".
+- **Root cause:** The committed HEAD `backend/server.js` still had `app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }))`, which copies the bare `CLIENT_URL` value straight into the `Access-Control-Allow-Origin` header. The `normalizeOrigin` fix from the 2026-09-16 lesson existed only in the **working tree (uncommitted)** and Render was deployed from pushed HEAD, so production kept failing. The deployed Vercel backend service also 500s on every request, which is why the frontend had been pointed at Render in the first place.
+- **Fix / prevention:** The working-tree `server.js` normalizeOrigin (trim, add `https://` for bare domains, `http://` for localhost, comma-separated allowlist, origin callback) produces a valid header locally (verified `204` + `ACAO: https://eduflow-backend-ca1q.vercel.app`). The fix must be **committed, pushed, and deployed to the exact origin the built frontend calls** (verify with the browsers' preflight: OPTIONS + Origin header, check ACAO starts with `http(s)://`). Diagnostics that pinpoint the cause: fetch the deployed bundle and check which origin `VITE_API_URL`/`Kn=` points to, then preflight THAT backend. A fix present in the working tree but not on the live service is still a live bug — confirm deployment coverage.
+- **Files involved:** `backend/server.js`, `backend/.env.example`, `frontend/src/api/client.js`
+
+### 2026-09-16 — Bare `CLIENT_URL` causes invalid CORS origin header on hosted API (CORS)
+- **What happened:** Browser blocked signup from the Vercel frontend to the Render API with:
+  `Access-Control-Allow-Origin header contains the invalid value 'eduflow-backend-ca1q.vercel.app'`.
+  The API returned an origin without `https://`, so the browser rejected the preflight/request.
+- **Root cause:** `backend/server.js` passed `process.env.CLIENT_URL` directly to `cors({ origin })`.
+  Hosted env vars were set as bare domains, but the CORS `Access-Control-Allow-Origin` header must
+  be a valid serialized origin including scheme, such as `https://eduflow-backend-ca1q.vercel.app`.
+- **Fix / prevention:** Normalize configured origins before passing them to `cors`: trim trailing
+  slashes, add `https://` for bare production domains, add `http://` for localhost, support
+  comma-separated allowlists (`CLIENT_URLS`, `FRONTEND_URLS`, `CORS_ORIGINS`), and use an origin
+  callback so credentials never pair with an invalid wildcard header. Verified by an OPTIONS preflight
+  using the bad bare-domain env value; response became `204` with a valid `Access-Control-Allow-Origin`.
+- **Files involved:** `backend/server.js`, `backend/.env.example`
+
 ### 2026-09-15 — `fetch` building `/api${API_URL}` instead of `/api${path}` → every API call hits one URL → 405 (frontend)
 - **What happened:** All API requests started failing with **405 Method Not Allowed** across
   unrelated endpoints (login, courses, quizzes). Frontend production build still succeeded.
@@ -52,14 +72,14 @@ Format per entry:
   dropped, so every request in the app went to the same literal URL; requests whose method did
   not match the backend route's method (e.g. POST vs GET) returned 405. The same commit also
   leaked `import.meta.env.VITE_API_URL` into CommonJS `backend/server.js` (later reverted).
-- **Fix / prevention:** `const API_URL = import.meta.env.VITE_API_URL || '';` and
-  `fetch(\`${API_URL}/api${path}\`)` — path is respected, and `VITE_API_URL` stays an optional
-  absent-by-default prefix. Cross-checked all 65 frontend `api.*` call sites against the backend
-  `routes/*` mounts; every URL now resolves to a real, method-correct route. When adding a new
-  screen, verify its `api.*` paths/methods against `backend/routes/*` (one file per resource).
-- **Files involved:** `frontend/src/api/client.js`, `backend/server.js`
-
-## Serverless / API
+- **Fix / prevention:** Normalize the optional API origin (`VITE_API_URL`) and always append the
+  actual request path: `API_BASE + apiPath`. The resulting URLs are correct whether `VITE_API_URL`
+  is unset, an origin (`https://host`), or already includes `/api` (`https://host/api`). Also changed
+  Vercel Services routing from legacy `/(.*)` patterns to docs-aligned `/:path*` patterns so `/api/*`
+  requests cannot fall through to the static frontend service and return 405 for POST/PUT/DELETE.
+  Cross-checked all 65 frontend `api.*` call sites against the backend `routes/*` mounts; every URL
+  now resolves to a real, method-correct route.
+- **Files involved:** `frontend/src/api/client.js`, `vercel.json`, `backend/server.js`
 
 ### 2026-09-07 — Vercel CLI 59 (services model) ignores legacy `builds`/`routes`; define services + entrypoint (deployment)
 - **What happened:** First build after the single-domain wiring failed:
