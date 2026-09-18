@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { tokenStore, userStore } from '../api/client.js';
 import ThemeToggle from './theme.jsx';
-import Logo from '../assets/Eduflow-logo.png';
+import Logo from '../assets/eduflow-logo.png';
 
 
 const dashboardFor = (role) => {
