@@ -1,21 +1,21 @@
-  {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "services": {
-      "frontend": {
-        "root": "frontend/",
-        "rewrites": [
-          { "source": "/(.*)", "destination": "/index.html" }
-        ]
-      },
-      "backend": {
-        "root": "backend/",
-        "framework": "express",
-        "entrypoint": "server.js"
-      }
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "frontend": {
+      "root": "frontend/",
+      "rewrites": [
+        { "source": "/:path*", "destination": "/index.html" }
+      ]
     },
-    "rewrites": [
-      { "source": "/api/(.*)", "destination": { "service": "backend" } },
-      { "source": "/uploads/(.*)", "destination": { "service": "backend" } },
-      { "source": "/(.*)", "destination": { "service": "frontend" } }
-    ]
-  }
+    "backend": {
+      "root": "backend/",
+      "framework": "express",
+      "entrypoint": "server.js"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": { "service": "backend" } },
+    { "source": "/uploads/:path*", "destination": { "service": "backend" } },
+    { "source": "/:path*", "destination": { "service": "frontend" } }
+  ]
+}

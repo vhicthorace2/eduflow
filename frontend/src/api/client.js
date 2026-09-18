@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'eduflow_token';
 const USER_KEY = 'eduflow_user';
-const API_URL = import.meta.env.VITE_API_URL || '';
+const API_ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const API_BASE = API_ORIGIN.endsWith('/api') ? API_ORIGIN : `${API_ORIGIN}/api`;
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -32,6 +33,7 @@ class ApiError extends Error {
 }
 
 async function request(path, options = {}) {
+  const apiPath = path.startsWith('/') ? path : `/${path}`;
   const token = tokenStore.get();
   const headers = { ...(options.headers || {}) };
 
@@ -42,7 +44,7 @@ async function request(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}/api${path}`, {
+  const response = await fetch(`${API_BASE}${apiPath}`, {
     ...options,
     headers,
     body:
