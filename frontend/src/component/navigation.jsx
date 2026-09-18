@@ -2,6 +2,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { tokenStore, userStore } from '../api/client.js';
 import ThemeToggle from './theme.jsx';
+import Logo from '../assets/Eduflow-logo';
+
 
 const dashboardFor = (role) => {
   if (role === 'admin') return '/adminDashboard';
@@ -42,8 +44,12 @@ function Navbar({ landing }) {
         className='mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8'
         aria-label='Primary'
       >
-        <NavLink to='/' end className='font-display text-2xl font-semibold tracking-tight text-content'>
-          EduFlow
+        <NavLink to="/" end className="w-5 h-5 rounded-full self-start shrink-0">
+          <img
+            src={Logo}
+            alt="EduFlow Logo"
+            className="w-full h-full rounded-full object-cover"
+          />
         </NavLink>
 
         <div className='hidden items-center gap-2 md:flex'>
