@@ -44,9 +44,9 @@ function Navbar({ landing }) {
         aria-label='Primary'
       >
         <NavLink to="/" end className="w-5 h-5 rounded-full self-start shrink-0">
-          <h2>
-            Eduflow
-          </h2>
+          <a aria-current="page" class="font-display text-2xl font-semibold tracking-tight text-content active" href="/" data-discover="true">
+            EduFlow
+          </a>
         </NavLink>
 
         <div className='hidden items-center gap-2 md:flex'>
