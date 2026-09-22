@@ -26,6 +26,7 @@ const assessmentRoutes = require('./routes/assessmentRoutes');
 const settingsRoutes = require('./routes/settings');
 const activityRoutes = require('./routes/activity');
 const leaderboardRoutes = require('./routes/leaderboard');
+const assistantRoutes = require('./routes/assistant');
 
 // Initialize Express app
 const app = express();
@@ -98,6 +99,7 @@ app.use('/api/assessment', assessmentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/assistant', assistantRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -127,7 +129,8 @@ app.get('/', (req, res) => {
       reports: '/api/reports',
       admin: '/api/admin',
       assessment: '/api/assessment',
-      settings: '/api/settings'
+      settings: '/api/settings',
+      assistant: '/api/assistant'
     }
   });
 });

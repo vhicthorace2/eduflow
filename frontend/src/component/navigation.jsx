@@ -2,7 +2,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { tokenStore, userStore } from '../api/client.js';
 import ThemeToggle from './theme.jsx';
-import Logo from '../assets/eduflow-logo.png';
 
 
 const dashboardFor = (role) => {
@@ -45,11 +44,9 @@ function Navbar({ landing }) {
         aria-label='Primary'
       >
         <NavLink to="/" end className="w-5 h-5 rounded-full self-start shrink-0">
-          <img
-            src={Logo}
-            alt="EduFlow Logo"
-            className="w-full h-full rounded-full object-cover"
-          />
+          <h2>
+            Eduflow
+          </h2>
         </NavLink>
 
         <div className='hidden items-center gap-2 md:flex'>

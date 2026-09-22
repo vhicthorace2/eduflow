@@ -4,7 +4,6 @@ import Navbar from '../component/navigation.jsx';
 import Footer from '../component/footer.jsx';
 import Reveal from '../component/reveal.jsx';
 import heroImg from '../assets/hero.jpg';
-import Logo from '../assets/Eduflow-logo';
 import { courseCover } from '../component/courseCovers.js';
 
 const stats = [

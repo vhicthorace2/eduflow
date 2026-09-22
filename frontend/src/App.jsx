@@ -18,6 +18,7 @@ import Quiz from './screens/quiz.jsx';
 import Settings from './screens/settings.jsx';
 import Messages from './screens/messages.jsx';
 import Leaderboard from './screens/leaderboard.jsx';
+import AiAssistant from './screens/aiAssistant.jsx';
 
 const dashboardFor = (role) => {
   if (role === 'admin') return '/adminDashboard';
@@ -120,6 +121,14 @@ function App() {
         element={
           <RequireRole roles={['student', 'instructor', 'admin']}>
             <Leaderboard />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/ai-assistant"
+        element={
+          <RequireRole roles={['student']}>
+            <AiAssistant />
           </RequireRole>
         }
       />

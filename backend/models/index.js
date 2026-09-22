@@ -13,6 +13,7 @@ const Gradebook = require('./Gradebook');
 const Message = require('./Message');
 const Enrollment = require('./Enrollment');
 const ActivityLog = require('./ActivityLog');
+const AssistantMessage = require('./AssistantMessage');
 
 // Define associations
 
@@ -102,6 +103,10 @@ User.hasMany(ActivityLog, { foreignKey: 'studentId', as: 'activityLogs' });
 ActivityLog.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
 Course.hasMany(ActivityLog, { foreignKey: 'courseId', as: 'activityLogs' });
 
+// AssistantMessage associations
+AssistantMessage.belongsTo(User, { foreignKey: 'studentId', as: 'student' });
+User.hasMany(AssistantMessage, { foreignKey: 'studentId', as: 'assistantMessages' });
+
 module.exports = {
   User,
   Course,
@@ -117,5 +122,6 @@ module.exports = {
   Gradebook,
   Message,
   Enrollment,
-  ActivityLog
+  ActivityLog,
+  AssistantMessage
 };
