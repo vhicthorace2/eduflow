@@ -607,3 +607,32 @@ Format per entry:
   `// eslint-disable-next-line react-hooks/exhaustive-deps` above the cleanup effect that intentionally
   runs only on unmount.
 - **Files involved:** `frontend/src/screens/coursesDetails.jsx`
+
+### 2026-09-22 — `Users` id sequence out of sync ⇒ `POST /api/auth/register` returns 500 (empty body)
+- **What happened:** Verifying the Ifeanyi chat endpoint required a test user; `register` returned 500 with an
+  empty body. `health` was fine. The runtime log only showed an `Error` at `User.create` with no message.
+- **Root cause:** `INSERT INTO "Users" ... VALUES (DEFAULT,...)` collided with an existing row:
+  `SequelizeUniqueConstraintError: duplicate key value violates unique constraint "Users_pkey"` against
+  `id = 4`. The Postgres `Users_id_seq` was behind `MAX(id)` (seq last_value 4 vs MAX 11) — classic
+  sequence drift, likely from a restore/import or explicit-id inserts.
+- **Fix / prevention:** `SELECT setval(pg_get_serial_sequence('"Users"','id'), (SELECT COALESCE(MAX(id),1) FROM "Users"))`.
+  Set seq back in sync (4 → 11); subsequent registrations got id 12+. This was a shared-prod data fix and
+  unblocks registration everywhere. Debug tip: error-wide `console.error(err)` prints only the name; inspect
+  `err.parent.message`, `err.fields`, `err.errors[]` when reproduced directly (a small throwaway script that
+  loads `config/database.js`'s exported `sequelize` — not `new Sequelize(config)` — surfaces the real message).
+- **Files involved:** shared Neon production DB (no code change); diagnosis via `backend/config/database.js`,
+  `backend/controllers/authController.js`.
+
+### 2026-09-22 — Ifeanyi assistant verified; fallback was OpenAI billing, not a code bug
+- **What happened:** New `POST /api/assistant/chat` (text + optional image) and `GET /api/assistant/history`
+  worked end-to-end (register 201, chat 201, history 200 with correct roles, unauth 401), but both text and
+  vision replies came back as the "offline mode" fallback.
+- **Root cause:** `client.responses.create` threw `429 credit_balance_exhausted` / `insufficient_quota`
+  (OpenAI account has no credits). `assistantAgent.js` catches the error and returns `fallbackReply`, which
+  is the intended degraded behavior — not a bug in the agent.
+- **Fix / prevention:** Add OpenAI credits. To diagnose silent agent fallbacks, probe the shared client
+  (`require('./services/openaiservices.js')`, log `status/code/type/message` on the thrown error) instead of
+  guessing at the agent's catch block. Agent follows the `assessmentAgent` pattern: guarded `if (client)`,
+  catch → deterministic fallback.
+- **Files involved:** `backend/agents/assistantAgent.js`, `backend/services/openaiservices.js`,
+  `backend/controllers/assistantController.js`, `backend/models/AssistantMessage.js`.
