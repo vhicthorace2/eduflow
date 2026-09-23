@@ -636,3 +636,23 @@ Format per entry:
   catch → deterministic fallback.
 - **Files involved:** `backend/agents/assistantAgent.js`, `backend/services/openaiservices.js`,
   `backend/controllers/assistantController.js`, `backend/models/AssistantMessage.js`.
+
+### 2026-09-23 — Learner-modelling + content/resource agents added; catalog is empty in production
+- **What happened:** Added `buildLearnerModel(studentId)` (priori knowledge, quiz/submission performance,
+  activity stats, preferences, difficulty areas) and `recommendResources({ studentId, learnerModel })`
+  (scores catalog materials: difficulty 30 + next-in-sequence 10 + new-but-unstudied 20 + enrolled 10),
+  wired as `GET /api/learner/model` and `/api/learner/recommendations` (auth + isStudent). Verified
+  end-to-end: fresh student → graceful empty model/recommendations; seeded scenario → difficulty area
+  detected (30% quiz) and top recommendation correctly targets the weak module.
+- **Gotcha 1 — eager associations:** `Material` has **no** direct `belongsTo(Course)` association, only
+  `belongsTo(Module)`; to get the course title you must nest `include: Module → include: Course`, not
+  `include: Course` on Material (Sequelize throws "model not associated").
+- **Gotcha 2 — production Neon catalog is empty:** `Courses` exist (ids 6+) but **zero** Modules, Quizzes,
+  or Materials. Any content-based recommendation will return an empty list until the catalog is populated;
+  verification required seeding throwaway rows. The `TASKS.md`/LESSONS notes about seeded SOE courses with
+  modules were stale relative to this DB (previous data was sqlite-era).
+- **Gotcha 3 — `Quiz.type` ENUM is `quiz | test | exam`**, not `mcq`; seeding `type: 'mcq'` throws a
+  validation error. `Quiz.instructorId` is NOT NULL and must point at an existing user row.
+- **Files involved:** `backend/agents/learnerModellingAgent.js`, `backend/agents/contentResourceAgent.js`,
+  `backend/controllers/learnerController.js`, `backend/routes/learner.js`, `backend/server.js`,
+  `backend/models/{Material,Quiz,Module,QuizAttempt,ActivityLog}.js`.

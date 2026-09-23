@@ -549,6 +549,33 @@ When you start, finish, or reprioritize work, update this file.
 
 ## Completed
 
+### 2026-09-23 — Learner-modelling + content/resource agents
+- **Status:** completed
+- **Summary:** Added both agents as deterministic backend modules wired to
+  student endpoints.
+- **Details:**
+  - `backend/agents/learnerModellingAgent.js` → `buildLearnerModel(studentId)`:
+    prior knowledge (enrolled/completed courses), performance (quiz avg, pass
+    rate, graded submissions), activities (by type, time, module views, active
+    days, engagement level), preferences, and `difficultyAreas` (courses with
+    avg quiz < 50%, ascending).
+  - `backend/agents/contentResourceAgent.js` → `recommendResources({ studentId,
+    learnerModel })`: scores catalog materials (difficulty 30, next-in-sequence
+    10, unstudied-new 20, enrolled 10), returns top 8 with reason + module/course
+    context.
+  - Endpoints: `GET /api/learner/model`, `GET /api/learner/recommendations`
+    (auth + isStudent) via `controllers/learnerController.js`, `routes/learner.js`,
+    mounted in `server.js`.
+  - Verified end-to-end: fresh student → empty model/recommendations (no crash);
+    seeded scenario → difficulty "SOE 504:30" detected, top recommendation =
+    weak module's material (score 70, reason "Targets an area you have found
+    difficult"). Test rows cleaned up.
+  - Note: production Neon catalog is empty (courses exist, no modules/quizzes/
+    materials), so recommendations stay empty until content is seeded.
+- **Files:** `backend/agents/learnerModellingAgent.js`,
+  `backend/agents/contentResourceAgent.js`, `backend/controllers/learnerController.js`,
+  `backend/routes/learner.js`, `backend/server.js`
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure
