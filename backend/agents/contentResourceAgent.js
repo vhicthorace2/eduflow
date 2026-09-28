@@ -6,6 +6,13 @@ const DIFFICULTY_WEIGHT = 30;
 const NEW_MATERIAL_WEIGHT = 20;
 const ENROLLED_WEIGHT = 10;
 const SEQUENCE_WEIGHT = 10;
+const PREFERENCE_WEIGHT = 25;
+
+const PREFERRED_TYPES = {
+  text: ['document', 'link'],
+  audio: ['audio', 'link'],
+  video: ['video']
+};
 
 /**
  * Content / Resource Agent
@@ -30,6 +37,8 @@ async function recommendResources({ studentId, learnerModel } = {}) {
 
   const enrolledCourseIds = (priorKnowledge.enrolledCourses || []).map((course) => course.courseId);
   const difficultyCourseIds = difficultyAreas.map((area) => area.courseId);
+  const learningMode = (model.profile && model.profile.learningMode) || null;
+  const preferredTypes = PREFERRED_TYPES[learningMode] || null;
   const engagedCourseIds = new Set([
     ...enrolledCourseIds,
     ...difficultyCourseIds
@@ -55,8 +64,11 @@ async function recommendResources({ studentId, learnerModel } = {}) {
     return { recommendations: [], total: 0 };
   }
 
+  const whereClause = { isActive: true, courseId: { [Op.in]: [...engagedCourseIds] } };
+  if (preferredTypes) whereClause.type = { [Op.in]: preferredTypes };
+
   const materials = await Material.findAll({
-    where: { isActive: true, courseId: { [Op.in]: [...engagedCourseIds] } },
+    where: whereClause,
     include: [
       {
         model: Module,
@@ -97,11 +109,19 @@ async function recommendResources({ studentId, learnerModel } = {}) {
         next = true;
       }
 
+      const fitsPreference = Boolean(preferredTypes && preferredTypes.includes(material.type));
+
       let score = 0;
       if (isDifficult) score += DIFFICULTY_WEIGHT;
       if (next) score += SEQUENCE_WEIGHT;
       if (!isStudied) score += NEW_MATERIAL_WEIGHT;
       if (isEnrolledScoped) score += ENROLLED_WEIGHT;
+      if (fitsPreference) score += PREFERENCE_WEIGHT;
+
+      let reason = pickReason(module, isStudied, isEnrolledScoped, isDifficult, next);
+      if (fitsPreference && (reason === 'Recommended learning material' || reason.startsWith('Review'))) {
+        reason = `Matches your ${learningMode} learning style`;
+      }
 
       return {
         materialId: material.id,
@@ -116,7 +136,7 @@ async function recommendResources({ studentId, learnerModel } = {}) {
         moduleOrder: module.order,
         courseId: course.id,
         courseTitle: course.title || 'Untitled course',
-        reason: pickReason(module, isStudied, isEnrolledScoped, isDifficult, next),
+        reason,
         score
       };
     })

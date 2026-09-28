@@ -19,7 +19,7 @@ const Material = sequelize.define('Material', {
     }
   },
   type: {
-    type: DataTypes.ENUM('document', 'image', 'video', 'link'),
+    type: DataTypes.ENUM('document', 'image', 'video', 'audio', 'link'),
     allowNull: false
   },
   fileUrl: {

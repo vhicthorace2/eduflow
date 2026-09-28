@@ -19,6 +19,7 @@ import Settings from './screens/settings.jsx';
 import Messages from './screens/messages.jsx';
 import Leaderboard from './screens/leaderboard.jsx';
 import AiAssistant from './screens/aiAssistant.jsx';
+import LearningPreferences from './screens/learningPreferences.jsx';
 
 const dashboardFor = (role) => {
   if (role === 'admin') return '/adminDashboard';
@@ -129,6 +130,14 @@ function App() {
         element={
           <RequireRole roles={['student']}>
             <AiAssistant />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/learning-preferences"
+        element={
+          <RequireRole roles={['student']}>
+            <LearningPreferences />
           </RequireRole>
         }
       />

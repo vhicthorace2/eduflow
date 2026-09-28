@@ -117,6 +117,8 @@ async function buildLearnerModel(studentId) {
     profile: {
       name: user?.name || 'Student',
       preferences: user?.preferences || { email: true, push: false, digest: true },
+      learningMode:
+        (user && user.preferences && user.preferences.learningMode) || null,
       engagement
     },
     priorKnowledge: {

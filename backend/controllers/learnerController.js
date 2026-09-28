@@ -1,5 +1,6 @@
 const { buildLearnerModel } = require('../agents/learnerModellingAgent.js');
 const { recommendResources } = require('../agents/contentResourceAgent.js');
+const { User } = require('../models');
 
 /**
  * Return the learner model for the authenticated student
@@ -9,6 +10,38 @@ exports.getLearnerModel = async (req, res, next) => {
   try {
     const model = await buildLearnerModel(req.user.id);
     res.status(200).json({ success: true, model });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const VALID_MODES = ['text', 'audio', 'video'];
+
+/**
+ * Persist the student's preferred mode of learning
+ * @route PUT /api/learner/preferences
+ */
+exports.setLearningMode = async (req, res, next) => {
+  try {
+    const { learningMode } = req.body;
+
+    if (!learningMode || !VALID_MODES.includes(learningMode)) {
+      return res.status(400).json({ message: 'learningMode must be one of: text, audio, video' });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.preferences = {
+      ...(user.preferences || { email: true, push: false, digest: true }),
+      learningMode
+    };
+    await user.save();
+
+    const model = await buildLearnerModel(req.user.id);
+    res.status(200).json({ success: true, model, learningMode });
   } catch (error) {
     next(error);
   }

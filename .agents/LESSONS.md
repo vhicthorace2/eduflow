@@ -656,3 +656,28 @@ Format per entry:
 - **Files involved:** `backend/agents/learnerModellingAgent.js`, `backend/agents/contentResourceAgent.js`,
   `backend/controllers/learnerController.js`, `backend/routes/learner.js`, `backend/server.js`,
   `backend/models/{Material,Quiz,Module,QuizAttempt,ActivityLog}.js`.
+
+### 2026-09-28 - Preferred learning mode (text/audio/video) captured and used to filter content; sandbox + enum gotchas
+- **What happened:** Added a preferred learning mode flow: `PUT /api/learner/preferences`
+  `{ learningMode: text|audio|video }` stores the value by merging into the existing `User.preferences` JSON
+  (not a new migration), the learner agent exposes `profile.learningMode`, and the content agent filters the
+  material catalogue to the preferred types (`text -> document/link`, `audio -> audio/link`, `video -> video`)
+  with a PREFERENCE_WEIGHT and a `Matches your {mode} learning style` reason. New student screen
+  `Learning Preferences` (`/learning-preferences`, sidebar link) prompts on first visit and lets them change
+  anytime. Verified end-to-end: audio pref returns only the audio material, text pref only document, invalid
+  mode rejected 400.
+- **Gotcha 1 - Windows sandbox kills orphaned child processes:** a server started with `Start-Process` is
+  killed when the bash tool call that spawned it returns, so an HTTP E2E server kept dying mid-run.
+  Fix: spawn the server AND run the test script inside the SAME command invocation, then Stop-Process.
+- **Gotcha 2 - `sequelize.query()` return shape:** it returns `[rows, metadata]` (array), not `{ rows }`;
+  destructure `const [rows] = await sequelize.query(...)`.
+- **Gotcha 3 - Postgres FK RESTRICT:** deleting a Module/Course/User that still has ActivityLog (or other)
+  child rows throws `SequelizeForeignKeyConstraintError` (SQLSTATE 23503). Delete children first; keep
+  cleanup so one failure cannot abort the rest (an uncaught throw in `finally` kills the whole cleanup).
+- **Gotcha 4 - extending a Postgres ENUM:** `ALTER TYPE "enum_Materials_type" ADD VALUE IF NOT EXISTS 'audio'`
+  must run standalone (not inside a transaction that uses the new value). On shared Neon this value already
+  existed before the migration (earlier Sequelize sync had added it) - always verify `pg_enum` first
+  (`SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname=...`).
+- **Files involved:** backend `agents/learnerModellingAgent.js`, `agents/contentResourceAgent.js`,
+  `controllers/learnerController.js`, `routes/learner.js`, `models/Material.js`; frontend
+  `screens/learningPreferences.jsx`, `App.jsx`, `component/sidebar.jsx`.

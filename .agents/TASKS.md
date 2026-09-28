@@ -576,6 +576,29 @@ When you start, finish, or reprioritize work, update this file.
   `backend/agents/contentResourceAgent.js`, `backend/controllers/learnerController.js`,
   `backend/routes/learner.js`, `backend/server.js`
 
+### 2026-09-28 — Preferred learning mode: prompt + preference-aware content filtering
+- **Status:** completed
+- **Summary:** Learners choose a preferred mode of learning (text/audio/video);
+  the content agent filters recommendations to that mode.
+- **Details:**
+  - `PUT /api/learner/preferences` `{ learningMode }` (auth + isStudent) validates
+    `text|audio|video` and merges into `User.preferences` JSON (existing settings
+    flags preserved). Learner agent now exposes `profile.learningMode`.
+  - Content agent filters the catalogue to preferred types (`text` -> document/link,
+    `audio` -> audio/link, `video` -> video), adds PREFERENCE_WEIGHT, and returns a
+    "Matches your {mode} learning style" reason.
+  - `Material.type` ENUM extended with `audio` (value already present on Neon;
+    verified via `pg_enum` before any ALTER).
+  - New student screen `Learning Preferences` (`/learning-preferences`) with a
+    first-time prompt; sidebar link + RequireRole(student) route.
+  - Verified end-to-end: initial model has `learningMode: null`; invalid mode
+    rejected 400; audio pref returns only the audio material; text pref only the
+    document; reason names the mode. Test rows cleaned up. Frontend lint + build green.
+- **Files:** `backend/models/Material.js`, `backend/agents/{learnerModellingAgent,contentResourceAgent}.js`,
+  `backend/controllers/learnerController.js`, `backend/routes/learner.js`,
+  `frontend/src/screens/learningPreferences.jsx`, `frontend/src/App.jsx`,
+  `frontend/src/component/sidebar.jsx`
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure
