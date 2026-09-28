@@ -681,3 +681,30 @@ Format per entry:
 - **Files involved:** backend `agents/learnerModellingAgent.js`, `agents/contentResourceAgent.js`,
   `controllers/learnerController.js`, `routes/learner.js`, `models/Material.js`; frontend
   `screens/learningPreferences.jsx`, `App.jsx`, `component/sidebar.jsx`.
+
+### 2026-09-28 — Enrollment gated behind the 10-question assessment; per-course text/audio/video content generated
+- **What happened:** Implemented the request to (a) make the assessment agent always ask exactly 10
+  questions and gate new course enrollment behind it, and (b) generate course content covering text,
+  audio, and video, stored in the DB. `POST /api/courses/enroll/:id` now returns
+  `{ requiresAssessment: true, assessmentId, questions }` (sanitized, correct answers kept on the server in
+  the shared `activeAssessments` map); enrollment is completed by `POST /api/assessment/submit`, which
+  auto-enrolls on any score. New script `backend/scripts/generateCourseContent.js` (`npm run generate-content`)
+  is idempotent and, per module, creates: a `document` study guide (markdown in `description`), an `audio`
+  lesson (`linkUrl` = deterministic YouTube search-result URL — no real media assets exist), and a `video`
+  lesson (`videoUrl` = YouTube search-result URL). Frontend `ModuleMaterials` now also renders `document`
+  and `audio` (was video/link only). Verified E2E on Neon: enroll → exactly 10 questions, no
+  `correctAnswer` leak, submit → enrolled, re-enroll → 200 "already enrolled", unknown course → 404; then
+  150 materials (50/50/50) created after seeding modules. Backend has no jest tests (suite is empty).
+- **Gotcha 1 — Courses auto-increment sequence drifted on shared Neon:** ids 6-12 were imported with
+  explicit ids, but `Courses_id_seq` sat at 8, so `seedCourses.js` inserts collided, `findOrCreate` silently
+  returned *other* courses and the seed aborted with a `SequelizeValidationError` ("Validation error", no model
+  named). Fix: `SELECT setval(pg_get_serial_sequence('"Courses"','id'), (SELECT MAX(id) FROM "Courses"), true)`.
+  Same class of bug as the earlier Users sequence fix — check sequences any time findOrCreate/seed inserts
+  misbehave on imported data.
+- **Gotcha 2 — the seed is a mutable catalog dump, not read-only:** `npm run db:seed` created demo users and
+  gradebook rows on shared Neon too. It is idempotent; re-running after a failed partial run is safe.
+- **Gotcha 3 — server port is 5000** (`.env PORT=5000`), not 4000; E2E health checks and API base must use it.
+- **Files involved:** backend `agents/assessmentAgent.js` (new `normalizeQuestions`, `QUESTION_COUNT=10`,
+  honors `OPENAI_MODEL`), `agents/assessmentStore.js` (new), `controllers/assessmentController.js`,
+  `controllers/courseController.js` (`enrollCourse` gated), `scripts/generateCourseContent.js` (new),
+  `package.json` (`generate-content` script); frontend `screens/coursesDetails.jsx`.

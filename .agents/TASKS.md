@@ -599,6 +599,37 @@ When you start, finish, or reprioritize work, update this file.
   `frontend/src/screens/learningPreferences.jsx`, `frontend/src/App.jsx`,
   `frontend/src/component/sidebar.jsx`
 
+### 2026-09-28 — Enrollment gated behind the 10-question assessment; per-course text/audio/video content
+- **Status:** completed
+- **Summary:** Assessment agent now always produces exactly 10 questions; course
+  enrollment is gated behind it; every course/module got generated learning content
+  (text study guide + audio + video) stored in the DB.
+- **Details:**
+  - `assessmentAgent.generateAssessment` normalizes/truncates to exactly 10
+    questions and honors `OPENAI_MODEL` (was hardcoded `gpt-5.5`).
+  - New shared `backend/agents/assessmentStore.js` (in-memory `activeAssessments`
+    map + `sanitizeQuestions`) used by both assessment + course controllers.
+  - `POST /api/courses/enroll/:id` no longer enrolls immediately: it returns
+    `requiresAssessment: true`, `assessmentId`, and the 10 sanitized questions
+    (answers kept server-side); `POST /api/assessment/submit` completes the
+    enrollment. Already-enrolled students still get the 200 "already enrolled".
+  - New `npm run generate-content` script: idempotent; per module creates/refreshes
+    a `document` study guide (markdown in `description`), an `audio` lesson and a
+    `video` lesson (deterministic YouTube search-result URLs — no real media files).
+  - Frontend `ModuleMaterials` in `coursesDetails.jsx` now renders `document` and
+    `audio` types (was video/link only).
+  - Shared Neon prepped: fixed `Courses_id_seq` drift (setval to MAX(id)) which was
+    breaking `db:seed`; ran seed (12 courses now, 50 modules) + generator
+    (150 materials: 50 document / 50 audio / 50 video). E2E verified on the live
+    server (port 5000): 10 questions, no correctAnswer leak, submit enrolls,
+    re-enroll polite, unknown course 404. Test rows cleaned.
+- **Files:** `backend/agents/assessmentAgent.js`, `backend/agents/assessmentStore.js` (new),
+  `backend/controllers/assessmentController.js`, `backend/controllers/courseController.js`,
+  `backend/scripts/generateCourseContent.js` (new), `backend/package.json`,
+  `frontend/src/screens/coursesDetails.jsx`
+- **Follow-up:** `document` descriptions are rendered as plain text (markdown not
+  parsed) — optional future improvement: a tiny markdown-to-JSX renderer.
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure

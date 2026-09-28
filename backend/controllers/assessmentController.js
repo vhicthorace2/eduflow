@@ -3,11 +3,7 @@ const { generateAssessment } = require('../agents/assessmentAgent.js');
 const { evaluateAnswers } = require('../agents/evaluationAgent.js');
 const { recommend } = require('../agents/recommendationAgent.js');
 const { Course, Module, Enrollment } = require('../models');
-
-const activeAssessments = new Map();
-
-const sanitizeQuestions = (questions) =>
-  questions.map(({ correctAnswer, ...question }) => question);
+const { activeAssessments, sanitizeQuestions } = require('../agents/assessmentStore.js');
 
 /**
  * Generate assessment questions for a course and keep the answers server-side

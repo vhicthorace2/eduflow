@@ -1,5 +1,27 @@
 const client = require('../services/openaiservices.js');
 
+const QUESTION_COUNT = 10;
+
+function normalizeQuestions(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (q) =>
+        q &&
+        typeof q.question === 'string' &&
+        q.question.trim() &&
+        Array.isArray(q.options) &&
+        q.options.length >= 2 &&
+        typeof q.correctAnswer === 'string' &&
+        q.correctAnswer.trim()
+    )
+    .map((q) => ({
+      question: String(q.question).trim(),
+      options: q.options.map((o) => String(o)).slice(0, 4),
+      correctAnswer: String(q.correctAnswer).trim()
+    }));
+}
+
 /**
  * Deterministic question banks per seeded course, so every course gets its own
  * assessment even when no OpenAI client is configured. Keys are normalized
@@ -164,25 +186,31 @@ function findBank(course) {
 }
 
 async function generateAssessment(course) {
+  const bank = normalizeQuestions(findBank(course) || genericQuestions);
+
   if (client) {
     try {
       const response = await client.responses.create({
-        model: 'gpt-5.5',
-        input: `Generate 10 beginner multiple choice questions for ${course} in JSON format`
+        model: process.env.OPENAI_MODEL || 'gpt-5.5',
+        input: `Generate ${QUESTION_COUNT} beginner multiple choice questions for ${course} in JSON format`
       });
 
       const text = response.output_text || '';
       const parsed = JSON.parse(text.replace(/^```json\s*|\s*```$/g, '').trim());
 
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      const generated = normalizeQuestions(parsed);
+      if (generated.length >= QUESTION_COUNT) {
+        return generated.slice(0, QUESTION_COUNT);
+      }
+      if (generated.length > 0) {
+        return [...generated, ...bank].slice(0, QUESTION_COUNT);
       }
     } catch (error) {
       // fall through to the course bank below
     }
   }
 
-  return findBank(course) || genericQuestions;
+  return bank.slice(0, QUESTION_COUNT);
 }
 
 module.exports = { generateAssessment };

@@ -8,8 +8,11 @@ const Assignment = require('../models/Assignment');
 const Submission = require('../models/Submission');
 const Gradebook = require('../models/Gradebook');
 const ActivityLog = require('../models/ActivityLog');
+const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { likeContains } = require('../utils/search');
+const { generateAssessment } = require('../agents/assessmentAgent.js');
+const { activeAssessments, sanitizeQuestions } = require('../agents/assessmentStore.js');
 
 /**
  * Get all courses
@@ -173,7 +176,10 @@ exports.deleteCourse = async (req, res, next) => {
 
 /**
  * Enroll in course (student only)
- * @route POST /api/courses/:id/enroll
+ * New enrollments are gated behind the 10-question placement assessment:
+ * the first call returns the questions, and enrollment is completed by
+ * POST /api/assessment/submit. Already-enrolled students get a 200 directly.
+ * @route POST /api/courses/enroll/:id
  */
 exports.enrollCourse = async (req, res, next) => {
   try {
@@ -183,15 +189,35 @@ exports.enrollCourse = async (req, res, next) => {
       return res.status(404).json({ message: 'Course not found' });
     }
 
-    const [enrollment, created] = await Enrollment.findOrCreate({
-      where: { courseId: course.id, studentId: req.user.id },
-      defaults: { status: 'active', enrolledAt: new Date() }
+    const existing = await Enrollment.findOne({
+      where: { courseId: course.id, studentId: req.user.id }
     });
 
-    res.status(created ? 201 : 200).json({
+    if (existing) {
+      return res.status(200).json({
+        success: true,
+        message: 'Already enrolled in this course',
+        enrollment: existing
+      });
+    }
+
+    const questions = await generateAssessment(course.title);
+
+    const assessmentId = crypto.randomUUID();
+    activeAssessments.set(assessmentId, {
+      course: course.title,
+      courseId: course.id,
+      questions,
+      correctAnswers: questions.map((q) => q.correctAnswer)
+    });
+
+    res.status(200).json({
       success: true,
-      message: created ? 'Enrolled successfully' : 'Already enrolled in this course',
-      enrollment
+      requiresAssessment: true,
+      message: 'Answer the 10-question assessment to complete your enrollment',
+      assessmentId,
+      course: course.title,
+      questions: sanitizeQuestions(questions)
     });
   } catch (error) {
     next(error);

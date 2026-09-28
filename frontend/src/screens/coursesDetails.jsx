@@ -94,6 +94,53 @@ function ModuleMaterials({ materials }) {
           </div>
         );
       })}
+      {materials.filter((m) => m.type === 'document').map((material) => (
+        <div key={material.id} className="rounded-2xl border border-line bg-card-deep p-4">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5 shrink-0 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <path d="M14 2v6h6M16 13H8m8 4H8m2-8H8" />
+            </svg>
+            <p className="text-sm font-semibold text-content">{material.title}</p>
+          </div>
+          {material.description && (
+            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-secondary">{material.description}</p>
+          )}
+        </div>
+      ))}
+      {materials.filter((m) => m.type === 'audio').map((material) => {
+        const source = material.fileUrl || material.videoUrl || null;
+        const isPlayable = source && /\.(mp3|m4a|wav|ogg|oga|opus)$/i.test(source);
+        return (
+          <div key={material.id} className="rounded-2xl border border-line bg-card-deep p-4">
+            <div className="flex items-center gap-2">
+              <svg className="h-5 w-5 shrink-0 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5L7 8H4a1 1 0 00-1 1v6a1 1 0 001 1h3l4 3V5z" />
+                <path d="M15.5 8.5a5 5 0 010 7M18 6a8 8 0 010 12" />
+              </svg>
+              <p className="text-sm font-semibold text-content">{material.title}</p>
+            </div>
+            {material.description && <p className="mt-1 text-sm text-muted">{material.description}</p>}
+            {isPlayable ? (
+              <audio className="mt-3 w-full" controls src={source}>
+                Your browser does not support audio playback.
+              </audio>
+            ) : material.linkUrl ? (
+              <a
+                href={material.linkUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded-full border border-line bg-card-deep px-4 py-2 text-sm font-medium text-accent transition hover:bg-card-hover"
+              >
+                Open audio lesson
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6m4-3h6v6m-11 5L22 3" />
+                </svg>
+              </a>
+            ) : null}
+          </div>
+        );
+      })}
       {materials.filter((m) => m.type === 'link').map((material) => (
         <a
           key={material.id}
