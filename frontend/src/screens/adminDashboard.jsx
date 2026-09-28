@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { userStore } from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
-import BackButton from '../component/backButton.jsx';
 import WelcomeHeading from '../component/welcomeHeading.jsx';
 import adminHeroImg from '../assets/admin-hero.jpg';
 
@@ -54,9 +53,6 @@ function AdminDashboard() {
       <Sidebar />
       <div className='relative p-6 pt-20 lg:p-8 md:pt-6 md:ml-72'>
         <div className='mx-auto max-w-7xl space-y-6'>
-          <div className='flex justify-start'>
-            <BackButton />
-          </div>
           {/* Header */}
           <header className='shadow-panel relative overflow-hidden rounded-2xl border border-line bg-card p-6 sm:flex-row sm:items-center sm:justify-between'>
             <img

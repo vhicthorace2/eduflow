@@ -630,6 +630,29 @@ When you start, finish, or reprioritize work, update this file.
 - **Follow-up:** `document` descriptions are rendered as plain text (markdown not
   parsed) — optional future improvement: a tiny markdown-to-JSX renderer.
 
+### 2026-09-28 — Switched AI provider to Groq (free tier)
+- **Status:** completed
+- **Summary:** All agent LLM calls now target Groq's free OpenAI-compatible
+  endpoint instead of the credit-exhausted OpenAI account.
+- **Details:**
+  - `services/openaiservices.js` exports `{ client, defaultModel }`: key =
+    `GROQ_API_KEY || OPENAI_API_KEY`, base URL = Groq unless `AI_PROVIDER=openai`
+    or `AI_BASE_URL` set; default model `llama-3.3-70b-versatile` (or
+    `OPENAI_MODEL` if explicitly running OpenAI).
+  - `assistantAgent.js` + `assessmentAgent.js` migrated from the Responses API
+    to `chat.completions.create` (`messages`, text via `choices[0].message.content`);
+    assistant history/vision parts converted to `text`/`image_url` chat format.
+  - `.env.example` documents Groq vars; `.env` keeps working via fallback chain.
+  - Verified E2E live (port 5000): register → enroll returns 10 questions →
+    Ifeanyi chat 201 with reply → history 2 rows. Because no `GROQ_API_KEY` is
+    set yet, agents exercised the offline/bank fallback (401 at Groq caught) —
+    real generations activate the moment the key is added. Test rows cleaned.
+- **Files:** `backend/services/openaiservices.js`, `backend/agents/assistantAgent.js`,
+  `backend/agents/assessmentAgent.js`, `backend/.env.example`
+- **Follow-up (user-side):** set `GROQ_API_KEY` in `backend/.env` (free at
+  console.groq.com). Optional: `AI_MODEL=llama-3.2-11b-vision-preview` so Ifeanyi
+  can read photos; `AI_MODEL=llama-3.3-70b-versatile` already the default.
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure

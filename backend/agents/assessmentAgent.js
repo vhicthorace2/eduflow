@@ -1,4 +1,4 @@
-const client = require('../services/openaiservices.js');
+const { client, defaultModel } = require('../services/openaiservices.js');
 
 const QUESTION_COUNT = 10;
 
@@ -190,12 +190,12 @@ async function generateAssessment(course) {
 
   if (client) {
     try {
-      const response = await client.responses.create({
-        model: process.env.OPENAI_MODEL || 'gpt-5.5',
-        input: `Generate ${QUESTION_COUNT} beginner multiple choice questions for ${course} in JSON format`
+      const response = await client.chat.completions.create({
+        model: defaultModel(),
+        messages: [{ role: 'user', content: `Generate ${QUESTION_COUNT} beginner multiple choice questions for ${course} in JSON format` }]
       });
 
-      const text = response.output_text || '';
+      const text = response.choices?.[0]?.message?.content || '';
       const parsed = JSON.parse(text.replace(/^```json\s*|\s*```$/g, '').trim());
 
       const generated = normalizeQuestions(parsed);

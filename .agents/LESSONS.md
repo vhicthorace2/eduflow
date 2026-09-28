@@ -708,3 +708,26 @@ Format per entry:
   honors `OPENAI_MODEL`), `agents/assessmentStore.js` (new), `controllers/assessmentController.js`,
   `controllers/courseController.js` (`enrollCourse` gated), `scripts/generateCourseContent.js` (new),
   `package.json` (`generate-content` script); frontend `screens/coursesDetails.jsx`.
+
+### 2026-09-28 — Switched AI provider from OpenAI to Groq (free tier); OpenAI-compatible call shape
+- **What happened:** OpenAI account has no credits (`429 credit_balance_exhausted`), so per the user's choice the
+  project now targets **Groq** (`https://api.groq.com/openai/v1`, OpenAI-compatible). `services/openaiservices.js`
+  no longer exports the raw client; it exports `{ client, defaultModel }` and resolves `GROQ_API_KEY ||
+  OPENAI_API_KEY`, with `AI_PROVIDER` (default `groq`) and `AI_BASE_URL` overrides. Both consuming agents
+  (`assistantAgent.js`, `assessmentAgent.js`) switched from the Responses API (`client.responses.create` +
+  `output_text`) to **Chat Completions** (`client.chat.completions.create({ messages })` +
+  `choices[0].message.content`), and from the Responses content-part types (`input_text`/`input_image`) to
+  chat parts (`text`/`image_url.image_url.url`). `defaultModel()` = `AI_MODEL || (provider==='openai' ?
+  OPENAI_MODEL||'gpt-5.5' : 'llama-3.3-70b-versatile')`.
+- **Gotcha 1 — Groq speaks Chat Completions, not the Responses API:** agents must use
+  `chat.completions.create` with a `messages` array; `responses.create`/`output_text`/`input_*` content parts
+  are OpenAI-only and fail/crash at Groq. Multi-turn history becomes plain `{ role, content: string }` entries.
+- **Gotcha 2 — model IDs are provider-specific:** the existing `OPENAI_MODEL=gpt-5.5` in `.env` is invalid on
+  Groq. `defaultModel()` therefore ignores `OPENAI_MODEL` unless `AI_PROVIDER=openai`; set `AI_MODEL` instead
+  (e.g. `llama-3.3-70b-versatile`, or `llama-3.2-11b-vision-preview` if Ifeanyi must answer photos — the text
+  model errors on `image_url` and silently falls back to offline replies).
+- **Gotcha 3 — remote AI client needs dotenv loaded first:** constructing the client at require-time means
+  `node -e "require('./services/openaiservices.js')"` (no dotenv) yields `client: null`; always load
+  `dotenv.config()` first or boot through `server.js`.
+- **Files involved:** backend `services/openaiservices.js` (rewritten), `agents/assistantAgent.js`,
+  `agents/assessmentAgent.js`, `.env.example` (Groq vars documented).

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const client = require('../services/openaiservices.js');
+const { client, defaultModel } = require('../services/openaiservices.js');
 
 const MIME_BY_EXT = {
   '.jpg': 'image/jpeg',
@@ -56,13 +56,12 @@ function buildInput(history, text, imageDataUrl) {
   const messages = [];
 
   for (const entry of history) {
-    const type = entry.role === 'assistant' ? 'output_text' : 'input_text';
-    messages.push({ role: entry.role, content: [{ type, text: String(entry.content || '') }] });
+    messages.push({ role: entry.role, content: String(entry.content || '') });
   }
 
   const parts = [];
-  if (text) parts.push({ type: 'input_text', text });
-  if (imageDataUrl) parts.push({ type: 'input_image', image_url: imageDataUrl });
+  if (text) parts.push({ type: 'text', text });
+  if (imageDataUrl) parts.push({ type: 'image_url', image_url: { url: imageDataUrl } });
 
   if (parts.length > 0) {
     messages.push({ role: 'user', content: parts });
@@ -77,13 +76,12 @@ async function generateReply({ content, imagePath, history }) {
       const imageDataUrl = imagePath ? toDataUrl(imagePath) : null;
       const input = buildInput(Array.isArray(history) ? history : [], content, imageDataUrl);
 
-      const response = await client.responses.create({
-        model: process.env.OPENAI_MODEL || 'gpt-5.5',
-        instructions: SYSTEM_PROMPT,
-        input
+      const response = await client.chat.completions.create({
+        model: defaultModel(),
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...input]
       });
 
-      const answer = (response.output_text || '').trim();
+      const answer = (response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content || '').trim();
       if (answer) return answer;
     } catch (error) {
       // fall through to the offline responder below

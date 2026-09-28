@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { userStore } from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
-import BackButton from '../component/backButton.jsx';
 import WelcomeHeading from '../component/welcomeHeading.jsx';
 import { courseCover } from '../component/courseCovers.js';
 import studentHeroImg from '../assets/student-hero.jpg';
@@ -230,10 +229,6 @@ function StudentDashboard() {
       <Sidebar />
       <div className="relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 md:ml-72">
         <div className="mx-auto max-w-6xl space-y-6">
-          <div>
-            <BackButton />
-          </div>
-
           {/* Header */}
           <div className="shadow-panel relative overflow-hidden rounded-3xl border border-line bg-card p-8 sm:p-10">
             <img
