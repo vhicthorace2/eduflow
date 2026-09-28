@@ -74,6 +74,7 @@ function ModuleMaterials({ materials }) {
       <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Materials</h4>
       {materials.filter((m) => m.type === 'video').map((material) => {
         const embed = videoEmbedUrl(material.videoUrl);
+        const isPlayable = /\.(mp4|webm|ogv|mov|m4v)$/i.test(material.videoUrl || '');
         return (
           <div key={material.id} className="rounded-2xl border border-line bg-card-deep p-4">
             <p className="text-sm font-semibold text-content">{material.title}</p>
@@ -86,11 +87,23 @@ function ModuleMaterials({ materials }) {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
-            ) : (
-              <video className="mt-3 aspect-video w-full rounded-xl border border-line" controls src={material.videoUrl}>
+            ) : isPlayable ? (
+              <video className="mt-3 aspect-video w-full rounded-xl border border-line" controls preload="metadata" src={material.videoUrl}>
                 Your browser does not support video playback.
               </video>
-            )}
+            ) : material.linkUrl ? (
+              <a
+                href={material.linkUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded-full border border-line bg-card-deep px-4 py-2 text-sm font-medium text-accent transition hover:bg-card-hover"
+              >
+                Open video lesson
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6m4-3h6v6m-11 5L22 3" />
+                </svg>
+              </a>
+            ) : null}
           </div>
         );
       })}

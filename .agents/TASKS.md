@@ -653,6 +653,27 @@ When you start, finish, or reprioritize work, update this file.
   console.groq.com). Optional: `AI_MODEL=llama-3.2-11b-vision-preview` so Ifeanyi
   can read photos; `AI_MODEL=llama-3.3-70b-versatile` already the default.
 
+### 2026-09-28 — Fixed course videos not loading/playing
+- **Status:** completed
+- **Summary:** Course-detail videos were dead because `videoUrl` pointed at
+  YouTube search-result pages (HTML), not streams.
+- **Details:**
+  - `generateCourseContent.js`: video materials now store a verified playable
+    CC0 MP4 in `videoUrl` (MDN cc0-videos + learningcontainer sample, rotated by
+    `module.order`) and keep the topic search as `linkUrl`. Re-ran generator →
+    50 video rows updated (audio/document unchanged).
+  - `coursesDetails.jsx` video block hardened: embeddable URL → iframe;
+    media-file URL → `<video preload="metadata">`; anything else → "Open video
+    lesson" link instead of a broken player.
+  - Verified end-to-end (boot + signed-in API): `/api/modules/course/:id`
+    returns 5 video materials for SOE 504, all `*.mp4`. Frontend lint + build
+    green. Test rows cleaned.
+- **Files:** backend `scripts/generateCourseContent.js`,
+  frontend `src/screens/coursesDetails.jsx`
+- **Follow-up:** the MP4s are CC0 demo clips, not topic-specific. If real
+  lecture videos are wanted, swap `videoUrl` per module to YouTube watch URLs
+  (embeddable via `videoEmbedUrl`) whenever real IDs/assets exist.
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure

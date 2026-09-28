@@ -731,3 +731,23 @@ Format per entry:
   `dotenv.config()` first or boot through `server.js`.
 - **Files involved:** backend `services/openaiservices.js` (rewritten), `agents/assistantAgent.js`,
   `agents/assessmentAgent.js`, `.env.example` (Groq vars documented).
+
+### 2026-09-28 — Course "video" materials wouldn't play (YouTube search URLs are not video streams)
+- **What happened:** Course-detail videos showed a dead player. Root cause: the content generator had stored
+  `https://www.youtube.com/results?search_query=...` (an HTML search-results page) in `Materials.videoUrl`.
+  The frontend `videoEmbedUrl()` returns null (no `v` param), so it fell into `<video src=searchUrl>`, and a
+  browser cannot stream an HTML page. Same latent trap for the audio rows (audio used `linkUrl`, which renders
+  as a button, so it was fine).
+- **Fix / prevention:** `generateCourseContent.js` now writes a **verified playable MP4** into `videoUrl`
+  (CC0 samples that returned `206 video/mp4` on a byte-range GET: MDN
+  `interactive-examples.mdn.mozilla.net/media/cc0-videos/{flower,friday}.mp4`,
+  `learningcontainer.com/.../sample-mp4-file.mp4`; rotated deterministically by `module.order`) and keeps the
+  topic search as `linkUrl` for further reading. Re-ran the idempotent generator → 50 video rows updated.
+  Frontend video block hardened: embeddable URL → iframe; media-file URL → `<video preload="metadata">`;
+  otherwise "Open video lesson" link (never a dead player).
+- **Gotcha — verifying media URLs:** PS 5.1 `Invoke-WebRequest` blocks the `Range` header on HTTP/2
+  ("must be modified using the appropriate property") and some buckets 403 plain HEADs; use
+  `curl.exe -s -o NUL -r 0-99 -w "%{http_code} %{content_type}"` to confirm a URL is actually streamable.
+- **Gotcha — `%` precedence:** `(module.order || 1) - 1 % PLAYABLE_VIDEOS.length` parses as
+  `order - (1 % len)`; must be `((module.order || 1) - 1) % PLAYABLE_VIDEOS.length`.
+- **Files involved:** backend `scripts/generateCourseContent.js`, frontend `screens/coursesDetails.jsx`.

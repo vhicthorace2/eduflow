@@ -16,6 +16,14 @@ const MATERIAL_ORDER = {
   video: 3
 };
 
+// Stable, publicly playable CC0 MP4s so the <video> element can stream them.
+// The topic search URL is kept as linkUrl for deeper exploration.
+const PLAYABLE_VIDEOS = [
+  'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+  'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4',
+  'https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4'
+];
+
 function studyGuide(courseTitle, moduleTitle) {
   return [
     `## ${moduleTitle} - Study Notes`,
@@ -54,7 +62,8 @@ async function generateContentForCourse(course) {
 
   for (const module of modules) {
     const audioUrl = searchUrl(`${course.title} ${module.title} audio lesson`);
-    const videoUrl = searchUrl(`${course.title} ${module.title} video lesson`);
+    const topicSearchUrl = searchUrl(`${course.title} ${module.title} video lesson`);
+    const playableVideo = PLAYABLE_VIDEOS[((module.order || 1) - 1) % PLAYABLE_VIDEOS.length];
 
     const templates = [
       {
@@ -76,10 +85,10 @@ async function generateContentForCourse(course) {
       {
         type: 'video',
         title: `${module.title} - Video Lesson`,
-        description: `Watch a video walkthrough of "${module.title}". Opens a curated set of video lessons for this topic.`,
+        description: `Watch a video walkthrough of "${module.title}", then open the linked lesson search for more on this topic.`,
         fileUrl: null,
-        videoUrl,
-        linkUrl: null
+        videoUrl: playableVideo,
+        linkUrl: topicSearchUrl
       }
     ];
 
