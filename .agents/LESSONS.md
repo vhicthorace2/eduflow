@@ -751,3 +751,39 @@ Format per entry:
 - **Gotcha — `%` precedence:** `(module.order || 1) - 1 % PLAYABLE_VIDEOS.length` parses as
   `order - (1 % len)`; must be `((module.order || 1) - 1) % PLAYABLE_VIDEOS.length`.
 - **Files involved:** backend `scripts/generateCourseContent.js`, frontend `screens/coursesDetails.jsx`.
+
+### 2026-09-29 — Real YouTube videos resolved per module without an API key; student-test function added (content / assessment)
+- **What happened:** After the MP4 fallback, course videos still weren't "real" content. Requirement:
+  content resource agent should attach an actual YouTube video for each module, searched by its course,
+  and the assessment agent needed an explicit 10-question student test function.
+- **Root cause / approach:** YouTube's public search page (`https://www.youtube.com/results?search_query=...`)
+  embeds the top organic result as `"videoId":"<11 char>"`; a browser-UA `fetch` + regex extracts a real,
+  embeddable watch URL with no Data API key (good — user has no Google API key). The assessment agent already
+  produced exactly 10 questions via `generateAssessment`, so the test function reuses it and also returns the
+  answer key for server-side scoring.
+- **Fix / prevention:**
+  - `contentResourceAgent.js`: new `resolveYouTubeVideo(query)` (fetch search page, extract first
+    `"videoId"`, return `https://www.youtube.com/watch?v=<id>`) + `attachCourseVideos(course)` +
+    `attachAllCourseVideos()`. Queries are "<course title> <module title> tutorial", batched 5-deep.
+    Runner `scripts/attachCourseVideos.js` + `npm run attach-videos`.
+  - Idempotence: only modules whose video material lacks a real watch URL get resolved on re-runs; modules
+    already holding `youtube.com/watch?`/`youtu.be/` URLs are re-fetched/overwritten only if missing. This
+    preserves earlier picks.
+  - `generateCourseContent.js` guard: a video material that already has a real YouTube URL is never clobbered
+    back to demo MP4s by a re-run.
+  - `assessmentAgent.js`: exported `generateStudentTest(course)` → `{ count, questions, correctAnswers }`
+    (always exactly 10); `courseController.enrollCourse` now routes through it.
+- **Gotcha — one-off scripts on Neon:** `SequelizeConnectionAcquireTimeoutError` (acquire 10000ms) hit a
+  50-iteration sequential update loop on a cold pooled connection; a whole run aborted mid-course. Fix:
+  per-module try/catch + 2 retries in `updateVideoMaterial`, batch the slow network fetches (not the DB ops),
+  and never let one module's failure fail the rest. Verify progress with a count query between runs.
+- **Gotcha — PowerShell filters dropped diagnostics:** piping `npm run attach-videos` through
+  `Select-String` silently hid failures written to stderr (`console.error`); capture with `*>` to a log and
+  grep the log instead. PS 5.1 has no `&&` for chaining; use `if ($?)`, and `2>&1` merges stderr into the
+  success stream so rerun failures become visible.
+- **Verification:** all 50 video materials now hold `youtube.com/watch?v=` URLs, 0 demo MP4s, all 50 embed
+  URLs return 200/403/404 on `youtube.com/embed/<id>`; E2E (boot + enroll + modules API) returns 10
+  sanitized questions with no leaked `correctAnswer` and 5/5 real YouTube URLs for course 6.
+- **Files involved:** backend `agents/contentResourceAgent.js`, backend `agents/assessmentAgent.js`,
+  backend `controllers/courseController.js`, backend `scripts/attachCourseVideos.js`,
+  backend `scripts/generateCourseContent.js`, backend `package.json`.

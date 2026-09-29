@@ -11,7 +11,7 @@ const ActivityLog = require('../models/ActivityLog');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { likeContains } = require('../utils/search');
-const { generateAssessment } = require('../agents/assessmentAgent.js');
+const { generateStudentTest } = require('../agents/assessmentAgent.js');
 const { activeAssessments, sanitizeQuestions } = require('../agents/assessmentStore.js');
 
 /**
@@ -201,14 +201,14 @@ exports.enrollCourse = async (req, res, next) => {
       });
     }
 
-    const questions = await generateAssessment(course.title);
+    const test = await generateStudentTest(course.title);
 
     const assessmentId = crypto.randomUUID();
     activeAssessments.set(assessmentId, {
       course: course.title,
       courseId: course.id,
-      questions,
-      correctAnswers: questions.map((q) => q.correctAnswer)
+      questions: test.questions,
+      correctAnswers: test.correctAnswers
     });
 
     res.status(200).json({
@@ -217,7 +217,7 @@ exports.enrollCourse = async (req, res, next) => {
       message: 'Answer the 10-question assessment to complete your enrollment',
       assessmentId,
       course: course.title,
-      questions: sanitizeQuestions(questions)
+      questions: sanitizeQuestions(test.questions)
     });
   } catch (error) {
     next(error);

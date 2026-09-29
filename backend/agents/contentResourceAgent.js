@@ -8,6 +8,10 @@ const ENROLLED_WEIGHT = 10;
 const SEQUENCE_WEIGHT = 10;
 const PREFERENCE_WEIGHT = 25;
 
+const YOUTUBE_SEARCH_URL = 'https://www.youtube.com/results?search_query=';
+const YOUTUBE_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
 const PREFERRED_TYPES = {
   text: ['document', 'link'],
   audio: ['audio', 'link'],
@@ -146,4 +150,108 @@ async function recommendResources({ studentId, learnerModel } = {}) {
   return { recommendations: ranked, total: ranked.length };
 }
 
-module.exports = { recommendResources };
+/**
+ * Resolve the top real YouTube video for a search query (no API key needed).
+ * Fetches the search page and extracts the first embedded video ID, returning
+ * a canonical `https://www.youtube.com/watch?v=<id>` URL — or null when the
+ * video cannot be resolved (network blocked, no results).
+ */
+async function resolveYouTubeVideo(searchQuery) {
+  try {
+    const url = YOUTUBE_SEARCH_URL + encodeURIComponent(searchQuery);
+    const res = await fetch(url, {
+      headers: { 'User-Agent': YOUTUBE_UA, 'Accept-Language': 'en-US,en;q=0.9' },
+      redirect: 'follow'
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const match = html.match(/"videoId":"([\w-]{11})"/);
+    return match ? `https://www.youtube.com/watch?v=${match[1]}` : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Persist a watch URL on a module's video material, retrying transient pool
+ * errors (e.g. a slow cold Neon connection) so one failure never aborts the
+ * rest of the course run.
+ */
+async function updateVideoMaterial(module, watchUrl) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const [affected] = await Material.update(
+        { videoUrl: watchUrl, linkUrl: watchUrl },
+        { where: { moduleId: module.id, type: 'video' } }
+      );
+      return { updated: Number(affected) > 0, error: null };
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+    }
+  }
+  return { updated: false, error: lastError };
+}
+
+/**
+ * Attach a real YouTube video to every module's "Video Lesson" material for a
+ * course, searched by module topic ("<course title> <module title> tutorial").
+ * Persists the watch URL into the material's videoUrl + linkUrl so the
+ * frontend embeds it directly. Falls back to the existing value when YouTube
+ * is unreachable, keeping any material that already has a playable video.
+ */
+async function attachCourseVideos(course) {
+  const modules = await Module.findAll({
+    where: { courseId: course.id, isActive: true },
+    order: [['order', 'ASC']]
+  });
+
+  const videos = await Material.findAll({
+    where: { moduleId: { [Op.in]: modules.map((m) => m.id) }, type: 'video' }
+  });
+  const existingByModule = new Map(videos.map((m) => [m.moduleId, m.videoUrl]));
+  const isReal = (url) => url && /(youtube\.com\/watch\?|youtu\.be\/)/.test(url);
+
+  const pending = modules.filter((m) => !isReal(existingByModule.get(m.id)));
+
+  const batchSize = 5;
+  const results = [];
+  for (let i = 0; i < pending.length; i += batchSize) {
+    const batch = pending.slice(i, i + batchSize);
+    const watchUrls = await Promise.all(
+      batch.map((module) => resolveYouTubeVideo(`${course.title} ${module.title} tutorial`))
+    );
+
+    for (let j = 0; j < batch.length; j++) {
+      const module = batch[j];
+      const watchUrl = watchUrls[j];
+      const persist = watchUrl
+        ? await updateVideoMaterial(module, watchUrl)
+        : { updated: false, error: null };
+
+      results.push({
+        courseId: course.id,
+        courseTitle: course.title,
+        moduleId: module.id,
+        moduleTitle: module.title,
+        videoUrl: watchUrl,
+        updated: persist.updated,
+        error: persist.error ? persist.error.message : null
+      });
+    }
+  }
+
+  return results;
+}
+
+async function attachAllCourseVideos() {
+  const courses = await Course.findAll({ where: { isActive: true }, order: [['title', 'ASC']] });
+  const results = [];
+  for (const course of courses) {
+    results.push(...(await attachCourseVideos(course)));
+  }
+  return results;
+}
+
+module.exports = { recommendResources, resolveYouTubeVideo, attachCourseVideos, attachAllCourseVideos };

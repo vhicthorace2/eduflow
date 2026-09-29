@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "test": "jest",
     "db:seed": "node scripts/seedCourses.js",
-    "generate-content": "node scripts/generateCourseContent.js"
+    "generate-content": "node scripts/generateCourseContent.js",
+    "attach-videos": "node scripts/attachCourseVideos.js"
   },
   "keywords": [
     "education",

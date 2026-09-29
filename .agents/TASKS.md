@@ -674,6 +674,39 @@ When you start, finish, or reprioritize work, update this file.
   lecture videos are wanted, swap `videoUrl` per module to YouTube watch URLs
   (embeddable via `videoEmbedUrl`) whenever real IDs/assets exist.
 
+### 2026-09-29 — Real YouTube videos per module (content resource agent) + student test function (assessment agent)
+- **Status:** completed
+- **Summary:** Content resource agent now attaches real, topic-specific YouTube
+  videos to every module of its course (no API key); the assessment agent got an
+  explicit 10-question student test function.
+- **Details:**
+  - `contentResourceAgent.js`: `resolveYouTubeVideo(query)` fetches the public
+    `youtube.com/results` page with a browser UA and extracts the top
+    `"videoId"` → `https://www.youtube.com/watch?v=<id>`; `attachCourseVideos(course)`
+    queries "<course> <module> tutorial" per module (5-deep batches, per-module
+    retry via `updateVideoMaterial`) and persists `videoUrl` + `linkUrl` on the
+    module's `video` material. Re-runs are idempotent (existing real watch URLs
+    are preserved). New runner `scripts/attachCourseVideos.js` +
+    `npm run attach-videos`.
+  - `generateCourseContent.js`: added a guard so re-running generate-content never
+    overwrites a video material that already has a real YouTube URL back to demo MP4s.
+  - `assessmentAgent.js`: new exported `generateStudentTest(course)` →
+    `{ count, questions, correctAnswers }` (exactly 10, answer key for
+    server-side scoring). `courseController.enrollCourse` routes through it.
+  - Verified: all 50 video materials now hold `youtube.com/watch?v=` URLs (0 demo
+    MP4s); all 50 `youtube.com/embed/<id>` fetches return 200/403/404; E2E
+    (boot + enroll + modules API) → 10 sanitized questions (no leaked answers) and
+    5/5 real YouTube URLs on course 6. Test users cleaned.
+- **Files:** backend `agents/contentResourceAgent.js`,
+  backend `agents/assessmentAgent.js`, backend `controllers/courseController.js`,
+  backend `scripts/attachCourseVideos.js`, backend `scripts/generateCourseContent.js`,
+  backend `package.json`
+- **Follow-up:** YouTube scraping is unauthenticated and could be throttled/blocked
+  in some regions or by IP rotation over time; all fetches are best-effort with
+  graceful fallback to the existing value. If a YouTube Data API v3 key is ever
+  provided, `resolveYouTubeVideo` is the single place to swap in the official
+  `search.list` call.
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure

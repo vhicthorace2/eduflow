@@ -213,4 +213,19 @@ async function generateAssessment(course) {
   return bank.slice(0, QUESTION_COUNT);
 }
 
-module.exports = { generateAssessment };
+/**
+ * Generate a placement test for a student on a given course: exactly
+ * QUESTION_COUNT (10) questions together with the answer key, so the caller
+ * can present the questions client-side and score the submission server-side
+ * against `correctAnswers`.
+ */
+async function generateStudentTest(course) {
+  const questions = await generateAssessment(course);
+  return {
+    count: questions.length,
+    questions,
+    correctAnswers: questions.map((q) => q.correctAnswer)
+  };
+}
+
+module.exports = { generateAssessment, generateStudentTest };

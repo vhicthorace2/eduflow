@@ -110,15 +110,18 @@ async function generateContentForCourse(course) {
       if (wasCreated) {
         created++;
       } else {
+        const hasRealVideo =
+          material.type === 'video' &&
+          /(youtube\.com\/watch\?|youtu\.be\/)/.test(material.videoUrl || '');
         const stale =
           material.description !== template.description ||
-          (material.videoUrl || null) !== template.videoUrl ||
-          (material.linkUrl || null) !== template.linkUrl;
+          (!hasRealVideo && (material.videoUrl || null) !== template.videoUrl) ||
+          (!hasRealVideo && (material.linkUrl || null) !== template.linkUrl);
         if (stale) {
           await material.update({
             description: template.description,
-            videoUrl: template.videoUrl,
-            linkUrl: template.linkUrl,
+            videoUrl: hasRealVideo ? material.videoUrl : template.videoUrl,
+            linkUrl: hasRealVideo ? material.linkUrl : template.linkUrl,
             isActive: true
           });
           updated++;
