@@ -959,3 +959,40 @@ Format per entry:
   `videosOk`, `audiosOk`, `docsOk` all true. Frontend `npm run lint` + `npm run build` green (new bundle
   `index-BceNDVur.js`). Scratch script deleted.
 - **Files involved:** backend `agents/contentResourceAgent.js`, frontend `screens/studentDashboard.jsx`.
+
+### 2026-09-30 — Module-level personalization: more videos/audio/text per module for the learner's mode (backend / agents)
+- **What happened:** Requirement: inside a MODULE, the learner should see more content of their preferred format —
+  more videos for a video-preference user, more audio for audio, more text for text. The feed-level 70/30 weighting
+  (previous entries) changed recommendation counts but not the per-module materials screen, which still showed the
+  fixed catalogue (1 video + 1 audio + 1 document per module) to everyone.
+- **Approach:** personalization at the module read layer, not in the shared catalogue. `GET /api/modules/course/:id`
+  (and `/api/modules/:id`) now accepts an optional JWT (`authOptional` new middleware in `middleware/auth.js`);
+  when the requester is a `student` with `preferences.learningMode`, the content agent appends VIRTUAL materials so
+  the module has ≥ `AUGMENT_TARGET` (3) items of the mode's types (`video` for video; `audio`+`link` for audio;
+  `document`+`link` for text). Non-preferred formats stay, so variety is preserved — only the mode's count rises.
+- **Gotchas:**
+  - **Never persist augmentation back to `Materials`:** the catalogue is shared by all learners; writing enriched
+    rows would leak one user's personalization to everyone. Output plain objects (`module.get({ plain: true })` then
+    `materials.concat(extras)`) instead of mutating Sequelize instances.
+  - **Optional auth ≠ global auth:** swapping the public GET routes to the strict `auth` middleware would 401
+    anonymous crawlers and the instructor content screen's tokenless calls. Use `auth.authOptional` (valid token →
+    `req.user`, else continue) and gate personalization on `req.user?.role === 'student'`.
+  - **Route order:** `/course/:courseId` must stay registered before `/:id` (existing rule) — the new middleware
+    doesn't change that.
+  - **Video resolution cost is per-module, so cache it:** a course's first augmented view resolves up to 2 extra
+    videos per module. Cache resolved watch URLs in an in-memory `Map` (`moduleAugmentCache`, key
+    `` `${moduleId}:${query}` ``) so repeat loads are instant; resolve each module's extras sequentially while
+    running the two fetches within a module in parallel; failures degrade to the search-url link (frontend already
+    renders "Open video lesson" when `videoUrl` is null).
+  - **"More text" has no external source:** generate document extras deterministically by splitting the module's
+    real `Module.content` into labelled reading parts (≥80-char paragraphs); when the content can't be split,
+    pad with `link` extras (`readingSearchUrl` → Google "study guide" search) instead of fabricating prose.
+- **Verification:** backend E2E (boot + register + direct enrollment + per-mode `PUT /learner/preferences` +
+  `GET /api/modules/course/:id`): video mode → each of the 4 modules shows 3 videos (3 with real
+  `youtube.com/watch?v=` URLs, total 5 = 3 video + 1 audio + 1 document); audio mode → each module 3 audio/link;
+  text mode → each module 3 document/link (reading parts split from module content); instructors and anonymous
+  GETs are NOT augmented (`_augmented` absent); `SOME_EXTRA_CONTENT_DETECTED` true; test users + enrollment
+  deleted. Scratch script deleted. Frontend unchanged (ModuleMaterials already renders every type, including
+  virtual items).
+- **Files involved:** backend `middleware/auth.js`, `agents/contentResourceAgent.js`, `controllers/moduleController.js`,
+  `routes/modules.js`.

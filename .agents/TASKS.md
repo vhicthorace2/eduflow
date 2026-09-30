@@ -33,6 +33,28 @@ When you start, finish, or reprioritize work, update this file.
 - **Files:** `backend/agents/contentResourceAgent.js`, `frontend/src/screens/studentDashboard.jsx`
 - **Follow-up:** UI not yet eyeballed in a real browser (visual check pending on next WATCH/live run).
 
+### 2026-09-30 — Module-level personalization: more videos/audio/text per module for the learner's mode
+- **Status:** completed
+- **Summary:** The per-module study screen now adapts to the learner's preferred mode: a video-mode learner sees
+  ≥3 videos in each module, an audio-mode learner ≥3 audio/link items, a text-mode learner ≥3 document/link items
+  (real reading parts split from the module's own content), while the other formats stay for variety.
+- **Backend:**
+  - `middleware/auth.js`: new `authOptional` (valid token → `req.user`, else continue) exported alongside `auth`.
+  - `agents/contentResourceAgent.js`: new `augmentModuleMaterials({ courseTitle, module, materials, learningMode })`
+    — appends VIRTUAL materials until the module has `AUGMENT_TARGET` (3) items of the mode's types
+    (`PREFERRED_TYPES`); video extras resolve real YouTube watch URLs on demand (cached per `moduleId:query`,
+    degrade to a search link), audio extras use curated search links, text extras split `Module.content` into
+    labelled reading parts (fallback: `link` items via a "study guide" search).
+  - `controllers/moduleController.js`: `getModules` personalizes only for `role === 'student'` with a
+    `learningMode`, and returns plain objects (`module.get({ plain: true })`) so virtual items serialize cleanly.
+  - `routes/modules.js`: public GETs `/course/:courseId` and `/:id` now use `auth.authOptional`.
+- **Verified:** backend E2E on Neon — video mode → 3 videos per module (3 with real watch URLs, 5 total
+  materials/module); audio mode → 3 audio/link per module; text mode → 3 document/link per module; instructor
+  token and anonymous GETs NOT augmented; test users + enrollment deleted. No frontend change needed —
+  `ModuleMaterials` already renders every type. Scratch script deleted.
+- **Files:** `backend/middleware/auth.js`, `backend/agents/contentResourceAgent.js`,
+  `backend/controllers/moduleController.js`, `backend/routes/modules.js`
+
 ### 2026-09-30 — Production refresh 404: SPA fallback was missing because the Vercel project never builds as services
 - **Status:** completed
 - **Summary:** Refreshing deep client-side routes on the live site returned 404. The project's dashboard preset was "Other" with Root Directory "frontend", so the repo-root services `vercel.json` was ignored and the SPA had no fallback. Added `frontend/vercel.json` with a catch-all SPA rewrite (excluding `/api` and `/uploads`) and redeployed to production.

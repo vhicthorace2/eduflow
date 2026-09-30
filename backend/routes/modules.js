@@ -10,9 +10,9 @@ const {
 const auth = require('../middleware/auth');
 const { isInstructorOrAdmin } = require('../middleware/rbac');
 
-// Public routes
-router.get('/course/:courseId', getModules);
-router.get('/:id', getModuleById);
+// Public routes (optionally personalized for signed-in students)
+router.get('/course/:courseId', auth.authOptional, getModules);
+router.get('/:id', auth.authOptional, getModuleById);
 
 // Instructor only routes
 router.post('/course/:courseId', auth, isInstructorOrAdmin, createModule);

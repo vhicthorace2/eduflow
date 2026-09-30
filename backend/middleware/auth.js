@@ -28,3 +28,25 @@ const auth = async (req, res, next) => {
 };
 
 module.exports = auth;
+
+/**
+ * Optional authentication middleware
+ * Attaches the user when a valid token is present, otherwise continues with
+ * `req.user` unset so the handler can personalize for signed-in students
+ * while staying open to anonymous callers.
+ */
+const authOptional = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return next();
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findByPk(decoded.id);
+    if (user) req.user = user;
+    return next();
+  } catch (error) {
+    return next();
+  }
+};
+
+module.exports.authOptional = authOptional;

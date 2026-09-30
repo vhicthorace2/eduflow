@@ -244,6 +244,151 @@ function audioSearchUrl(query) {
 }
 
 /**
+ * Module-content augmentation (personalization at the module level)
+ *
+ * A signed-in student with a preferred learning mode sees MORE resources of
+ * that format inside each module: a video learner gets up to
+ * AUGMENT_TARGET video items, an audio learner up to AUGMENT_TARGET audio/link
+ * items, a text learner up to AUGMENT_TARGET document/link items. Extras are
+ * virtual (not persisted) so every learner's module view stays personalized
+ * while the shared catalogue remains unchanged. Video URLs are resolved on
+ * demand and cached per module+query so repeat requests are instant.
+ */
+const AUGMENT_TARGET = 3;
+const MODE_QUERY_SUFFIXES = {
+  video: ['full lecture', 'tutorial explained', 'examples walkthrough'],
+  audio: ['audio lesson', 'podcast episode', 'explained out loud']
+};
+const moduleAugmentCache = new Map();
+
+function readingSearchUrl(query) {
+  return `https://www.google.com/search?q=${encodeURIComponent(`${query} study guide`)}`;
+}
+
+function partitionParagraphs(paragraphs, parts) {
+  if (!paragraphs.length) return [];
+  if (parts <= 1) return [paragraphs];
+  const per = Math.ceil(paragraphs.length / parts);
+  const chunks = [];
+  for (let i = 0; i < paragraphs.length; i += per) {
+    chunks.push(paragraphs.slice(i, i + per));
+  }
+  return chunks;
+}
+
+async function resolveCachedVideo(query, moduleId) {
+  const key = `${moduleId}:${query}`;
+  if (moduleAugmentCache.has(key)) return moduleAugmentCache.get(key);
+  const url = await resolveYouTubeVideo(query);
+  moduleAugmentCache.set(key, url || null);
+  return url || null;
+}
+
+/**
+ * Append virtual, preference-matched resources so the learner sees more of
+ * their preferred format within a module. Non-preferred formats are kept, so
+ * learners still get variety, but the count of their mode's format rises to
+ * AUGMENT_TARGET. Best-effort: video resolution failures degrade to a link.
+ */
+async function augmentModuleMaterials({ courseTitle, module, materials = [], learningMode }) {
+  if (!learningMode || !PREFERRED_TYPES[learningMode]) {
+    return materials;
+  }
+  const preferredTypes = PREFERRED_TYPES[learningMode];
+
+  const extras = [];
+  const existingPreferred = materials.filter((m) => preferredTypes.includes(m.type)).length;
+  const needed = Math.max(0, AUGMENT_TARGET - existingPreferred - extras.length);
+  if (needed === 0) return materials;
+
+  const baseOrder = Math.max(0, ...materials.map((m) => Number(m.order) || 0));
+
+  const makeExtra = (fields, index) => ({
+    id: `${module.id}-aug-${fields.type}-${index}`,
+    moduleId: module.id,
+    courseId: module.courseId,
+    order: baseOrder + index + 1,
+    _augmented: true,
+    ...fields
+  });
+
+  if (learningMode === 'video') {
+    const suffixes = MODE_QUERY_SUFFIXES.video;
+    let pendingIndex = 1;
+    for (const suffix of suffixes) {
+      if (extras.length >= needed) break;
+      const query = `${courseTitle} ${module.title || ''} ${suffix}`.trim();
+      const watchUrl = await resolveCachedVideo(query, module.id);
+      extras.push(
+        makeExtra(
+          {
+            type: 'video',
+            title: `${module.title || 'Video lesson'} ${extras.length + 1}`,
+            description: `Extra video for your ${learningMode} learning style (${suffix})`,
+            videoUrl: watchUrl,
+            linkUrl: YOUTUBE_SEARCH_URL + encodeURIComponent(query)
+          },
+          pendingIndex++
+        )
+      );
+    }
+  } else if (learningMode === 'audio') {
+    const suffixes = MODE_QUERY_SUFFIXES.audio;
+    for (const suffix of suffixes) {
+      if (extras.length >= needed) break;
+      const query = `${courseTitle} ${module.title || ''} ${suffix}`.trim();
+      extras.push(
+        makeExtra(
+          {
+            type: 'audio',
+            title: `${module.title || 'Audio lesson'} ${extras.length + 1}`,
+            description: `Extra audio for your ${learningMode} learning style (${suffix})`,
+            linkUrl: audioSearchUrl(query)
+          },
+          extras.length + 1
+        )
+      );
+    }
+  } else if (learningMode === 'text') {
+    const title = (module.title || '').trim();
+    const baseQuery = `${courseTitle} ${title}`.trim();
+    const paragraphs = String(module.content || '')
+      .split(/\n{2,}|\n/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 80);
+    const chunks = partitionParagraphs(paragraphs, needed);
+    for (let i = 0; i < needed; i++) {
+      const chunk = chunks[i] || [];
+      if (chunk.length >= 2) {
+        extras.push(
+          makeExtra(
+            {
+              type: 'document',
+              title: `${title || 'Study guide'} — reading ${i + 1}`,
+              description: chunk.join('\n\n')
+            },
+            extras.length + 1
+          )
+        );
+      } else {
+        extras.push(
+          makeExtra(
+            {
+              type: 'link',
+              title: `Deeper reading ${i + 1}: ${title || baseQuery}`,
+              linkUrl: readingSearchUrl(baseQuery || title)
+            },
+            extras.length + 1
+          )
+        );
+      }
+    }
+  }
+
+  return extras.length ? materials.concat(extras) : materials;
+}
+
+/**
  * Generate a playable, topic-specific video for a recommended item. When the
  * module's video material has no real YouTube watch URL yet, resolve one for
  * "<course title> <module title> tutorial" and persist it so later requests
@@ -349,4 +494,10 @@ async function attachAllCourseVideos() {
   return results;
 }
 
-module.exports = { recommendResources, resolveYouTubeVideo, attachCourseVideos, attachAllCourseVideos };
+module.exports = {
+  recommendResources,
+  resolveYouTubeVideo,
+  attachCourseVideos,
+  attachAllCourseVideos,
+  augmentModuleMaterials
+};

@@ -1,6 +1,7 @@
 const Module = require('../models/Module');
 const Course = require('../models/Course');
 const Material = require('../models/Material');
+const { augmentModuleMaterials } = require('../agents/contentResourceAgent');
 
 /**
  * Get all modules for a course
@@ -17,10 +18,35 @@ exports.getModules = async (req, res, next) => {
       order: [['order', 'ASC']]
     });
 
+    const learningMode =
+      req.user && req.user.role === 'student' && req.user.preferences
+        ? req.user.preferences.learningMode
+        : null;
+    let courseTitle = null;
+    if (learningMode) {
+      const course = await Course.findByPk(req.params.courseId);
+      courseTitle = course ? course.title : null;
+    }
+
+    let payload = modules;
+    if (learningMode && courseTitle) {
+      payload = [];
+      for (const module of modules) {
+        const plain = module.get({ plain: true });
+        plain.materials = await augmentModuleMaterials({
+          courseTitle,
+          module: plain,
+          materials: plain.materials || [],
+          learningMode
+        });
+        payload.push(plain);
+      }
+    }
+
     res.status(200).json({
       success: true,
-      count: modules.length,
-      modules
+      count: payload.length,
+      modules: payload
     });
   } catch (error) {
     next(error);
