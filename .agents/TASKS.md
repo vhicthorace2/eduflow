@@ -10,6 +10,13 @@ When you start, finish, or reprioritize work, update this file.
 
 ## Completed
 
+### 2026-09-30 — Production refresh 404: SPA fallback was missing because the Vercel project never builds as services
+- **Status:** completed
+- **Summary:** Refreshing deep client-side routes on the live site returned 404. The project's dashboard preset was "Other" with Root Directory "frontend", so the repo-root services `vercel.json` was ignored and the SPA had no fallback. Added `frontend/vercel.json` with a catch-all SPA rewrite (excluding `/api` and `/uploads`) and redeployed to production.
+- **Verified:** `/`, `/studentDashboard`, `/login` → 200 SPA; `/api/health` → real 404 (not index.html). Deployed via `npx vercel --prod`.
+- **Files:** `frontend/vercel.json` (new, uncommitted)
+- **Follow-up:** Optional — set Framework Preset to **Services** in the Vercel dashboard (and clear rootDirectory) to activate the repo-root `services` config so `/api` routes to the backend on the same domain; no CLI command exists for that setting.
+
 ### 2026-09-03 — Single-domain Vercel hosting: root workspaces package.json for backend + frontend
 - **Status:** completed
 - **Summary:** The repo already had `vercel.json` deploying both apps under one domain. Added the missing root

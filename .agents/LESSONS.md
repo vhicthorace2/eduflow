@@ -40,6 +40,12 @@ Format per entry:
   unexpectedly loses files.
 - **Files involved:** `.vercelignore`
 
+### 2026-09-30 — Refresh 404 on Vercel despite services `vercel.json`: project preset is frontend-only, root config ignored (deployment)
+- **What happened:** Refreshing any client-side route (`/studentDashboard`, `/login`) on `eduflow-backend-ca1q.vercel.app` returned 404 while `/` loaded the SPA; `/api/health` also 404. The repo-root `vercel.json` already had a `services` config with per-service SPA fallback (`/:path*` → `/index.html`) and top-level `/api` → backend routing, so config edits kept not fixing it.
+- **Root cause:** The Vercel project's dashboard settings were **Framework Preset = "Other"** and **Root Directory = "frontend"** (`npx vercel project inspect`]. Per Vercel docs, a project builds as services only when the dashboard preset is **Services** AND `vercel.json` has a `services` key. With preset "Other", Vercel ignores the root `vercel.json` entirely and builds the plain Vite SPA at `frontend/` — no SPA fallback and no backend. A fresh `npx vercel --prod` confirmed it: `vercel inspect` showed a single build at the project root, and deep links stayed 404.
+- **Fix / prevention:** Added `frontend/vercel.json` (the config file Vercel actually reads under this project setup) with a catch-all SPA rewrite, then deployed. Verified live: `/`, `/studentDashboard`, `/login` → 200 SPA; `/api/health` and `/uploads/...` → real 404. Keep `/api` and `/uploads` out of the fallback (`/((?!api|uploads).*)`) so API paths never return `index.html`. To serve the backend from the same domain the way the root services config intends, the dashboard must be switched to **Framework Preset = Services** with rootDirectory cleared (no CLI command exists for this), then redeployed.
+- **Files involved:** `frontend/vercel.json` (new)
+
 ## Serverless / API
 
 ### 2026-09-18 — Invalid CORS header returned in prod because the fix was never deployed to the service the frontend calls (CORS / deployment)
