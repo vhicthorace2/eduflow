@@ -740,7 +740,10 @@ When you start, finish, or reprioritize work, update this file.
     `/api/learner/recommendations`, so the change is backend-only.
   - **Onboarding pop-up** (`frontend/src/component/onboarding.jsx` new, `src/App.jsx`): 4-step modal
     (Welcome / Enroll in a course / Learn your way / Stay on track), prev/next/skip/done, progress dots, one-time per
-    user via `localStorage['eduflow_onboarding_<userId>']`; mounted inside `SidebarProvider`.
+    user via `localStorage['eduflow_onboarding_<userId>']`. Mounted through a `DashboardOnboarding` shim
+    (`useLocation`) so it only appears when the signed-in user lands on their dashboard
+    (`/studentDashboard`, `/instructorDashboard`, `/adminDashboard`) — i.e. right after sign-in, since login/signup
+    redirect to `dashboardFor(role)`.
   - **Course screen** (`frontend/src/screens/coursesDetails.jsx`): hero instructor card gained the email line; the
     long right-column Instructor card was removed; the content grid `lg:grid-cols-[1.2fr_0.8fr]` became
     `space-y-8` full-width. A stray duplicated `</>` `)}` `</main>` from the structural edit was caught in `git diff`

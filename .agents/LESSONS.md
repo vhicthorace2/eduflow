@@ -843,6 +843,11 @@ Format per entry:
   under providers and never blocks unauthenticated routes).
 - **Gotcha — one-time-per-user storage key:** keying the flag by plain user id keeps onboarding one-time per account
   while a shared key would hide it for every later user on the same device.
+- **Follow-up — gate it to the dashboard:** the guide was first mounted globally, so a logged-in user hitting any
+  first nav saw it everywhere. It must only appear when the user signs in and enters their dashboard: `App.jsx` now
+  renders it via a `DashboardOnboarding` shim (`useLocation`) that only mounts `<OnboardingGuide />` on
+  `/studentDashboard`, `/instructorDashboard`, `/adminDashboard`. Since login/signup redirect to
+  `dashboardFor(role)`, the pop-up naturally fires right after sign-in, once per account.
 - **Verification:** `npm run lint` clean; `npm run build` succeeds (component path transforms). Not yet opened in a real
   browser to eyeball the modal.
 - **Files involved:** frontend `src/component/onboarding.jsx` (new), `src/App.jsx`.

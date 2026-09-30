@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { userStore } from './api/client.js';
 import { SidebarProvider } from './component/sidebar.jsx';
 import OnboardingGuide from './component/onboarding.jsx';
@@ -28,6 +28,13 @@ const dashboardFor = (role) => {
   if (role === 'instructor' || role === 'lecturer') return '/instructorDashboard';
   return '/studentDashboard';
 };
+
+const DASHBOARD_PATHS = ['/studentDashboard', '/instructorDashboard', '/adminDashboard'];
+
+function DashboardOnboarding() {
+  const { pathname } = useLocation();
+  return DASHBOARD_PATHS.includes(pathname) ? <OnboardingGuide /> : null;
+}
 
 function RequireRole({ roles, children }) {
   const user = userStore.get();
@@ -146,7 +153,7 @@ function App() {
       />
       <Route path="*" element={<NotFound />} />
       </Routes>
-      <OnboardingGuide />
+      <DashboardOnboarding />
     </SidebarProvider>
   );
 }
