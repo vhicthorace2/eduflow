@@ -10,6 +10,29 @@ When you start, finish, or reprioritize work, update this file.
 
 ## Completed
 
+### 2026-09-30 — Content resource agent: dynamic preference-based feed + student dashboard "Recommended for You"
+- **Status:** completed
+- **Summary:** The content agent now generates a dynamic, preference-weighted resource feed — video learners get
+  more YouTube videos, audio learners more audio, text learners more text — and the student dashboard surfaces it
+  as a "Recommended for You" tab.
+- **Backend:** `contentResourceAgent.js` — `recommendResources` enriches the final mix (adds `preferred` flag each
+  item, returns `{ recommendations, total, learningMode, preferredCount }`): video items via `enrichVideoItem`
+  (persist a real YouTube watch URL when missing; no-op via `isRealWatchUrl` when already real), audio items via
+  `enrichAudioItem` (ensure a `http(s)` `linkUrl`). `resolveYouTubeVideo` fetch hardened with
+  `AbortSignal.timeout(7000)`.
+- **Frontend:** `studentDashboard.jsx` — new "Recommended for You" tab fetching `GET /api/learner/recommendations`;
+  per-item type badge, "Your style" flag on `preferred`, media preview (YouTube embed / `<video>` mp4 / audio link /
+  document excerpt), agent reason, "Open in course →" (`/courses/:courseId?module=<order>`), and "Set preference →"
+  when no mode is set.
+- **Verified:** backend E2E on Neon for all three modes —
+  video → `{video:4, document:2, audio:2}` totals 8, preferredCount 4, all videos real watch URLs;
+  audio → `{audio:4, document:2, video:2}`;
+  text → `{document:4, audio:2, video:2}`;
+  `learningMode` echoed, all type/URL/description assertions passed, test user + enrollment cleaned, scratch script
+  deleted. Frontend `npm run lint` clean + `npm run build` green.
+- **Files:** `backend/agents/contentResourceAgent.js`, `frontend/src/screens/studentDashboard.jsx`
+- **Follow-up:** UI not yet eyeballed in a real browser (visual check pending on next WATCH/live run).
+
 ### 2026-09-30 — Production refresh 404: SPA fallback was missing because the Vercel project never builds as services
 - **Status:** completed
 - **Summary:** Refreshing deep client-side routes on the live site returned 404. The project's dashboard preset was "Other" with Root Directory "frontend", so the repo-root services `vercel.json` was ignored and the SPA had no fallback. Added `frontend/vercel.json` with a catch-all SPA rewrite (excluding `/api` and `/uploads`) and redeployed to production.

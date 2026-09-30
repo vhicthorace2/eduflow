@@ -172,7 +172,22 @@ async function recommendResources({ studentId, learnerModel } = {}) {
     mix = mix.concat(deferredPreferred.slice(0, MAX_RECOMMENDATIONS - mix.length));
   }
 
-  return { recommendations: mix, total: mix.length };
+  // Generate dynamic, playable content on demand: every video in the feed gets
+  // a real YouTube watch URL when one is missing, audio items get a curated
+  // listen link, and preferences are flagged so the client can style the feed.
+  const preferredTypesForMode = preferredTypes || [];
+  const enriched = await Promise.all(
+    mix.map(async (item) => {
+      let out = item;
+      if (out.type === 'video') out = await enrichVideoItem(out);
+      else if (out.type === 'audio') out = await enrichAudioItem(out);
+      return { ...out, preferred: preferredTypesForMode.includes(out.type) };
+    })
+  );
+
+  const preferredCount = enriched.filter((item) => item.preferred).length;
+
+  return { recommendations: enriched, total: enriched.length, learningMode, preferredCount };
 }
 
 /**
@@ -186,7 +201,8 @@ async function resolveYouTubeVideo(searchQuery) {
     const url = YOUTUBE_SEARCH_URL + encodeURIComponent(searchQuery);
     const res = await fetch(url, {
       headers: { 'User-Agent': YOUTUBE_UA, 'Accept-Language': 'en-US,en;q=0.9' },
-      redirect: 'follow'
+      redirect: 'follow',
+      signal: AbortSignal.timeout(7000)
     });
     if (!res.ok) return null;
     const html = await res.text();
@@ -217,6 +233,60 @@ async function updateVideoMaterial(module, watchUrl) {
     }
   }
   return { updated: false, error: lastError };
+}
+
+function isRealWatchUrl(url) {
+  return Boolean(url && /(youtube\.com\/watch\?|youtu\.be\/)/.test(url));
+}
+
+function audioSearchUrl(query) {
+  return YOUTUBE_SEARCH_URL + encodeURIComponent(query);
+}
+
+/**
+ * Generate a playable, topic-specific video for a recommended item. When the
+ * module's video material has no real YouTube watch URL yet, resolve one for
+ * "<course title> <module title> tutorial" and persist it so later requests
+ * reuse it. Best-effort: any failure returns the item unchanged.
+ */
+async function enrichVideoItem(item) {
+  try {
+    const material = await Material.findByPk(item.materialId);
+    if (!material || material.type !== 'video') return item;
+    if (isRealWatchUrl(material.videoUrl)) {
+      return { ...item, videoUrl: material.videoUrl, linkUrl: material.linkUrl };
+    }
+    const watchUrl = await resolveYouTubeVideo(`${item.courseTitle} ${item.moduleTitle} tutorial`);
+    if (!watchUrl) return item;
+    const persisted = await updateVideoMaterial({ id: item.moduleId }, watchUrl);
+    return {
+      ...item,
+      videoUrl: watchUrl,
+      linkUrl: persisted.updated ? watchUrl : material.linkUrl || item.linkUrl
+    };
+  } catch (error) {
+    return item;
+  }
+}
+
+/**
+ * Generate a curated audio link for a recommended audio item. Audio controls
+ * the agent itself cannot synthesize, so it attaches a topic-specific search
+ * URL that opens audio/lecture results. Best-effort and idempotent.
+ */
+async function enrichAudioItem(item) {
+  try {
+    const material = await Material.findByPk(item.materialId);
+    const existing = (material && material.linkUrl) || item.linkUrl;
+    if (existing && /^https?:\/\//i.test(existing)) return { ...item, linkUrl: existing };
+    const url = audioSearchUrl(`${item.courseTitle} ${item.moduleTitle} audio lesson`);
+    if (material) {
+      await Material.update({ linkUrl: url }, { where: { id: item.materialId } }).catch(() => {});
+    }
+    return { ...item, linkUrl: url };
+  } catch (error) {
+    return item;
+  }
 }
 
 /**

@@ -919,3 +919,43 @@ Format per entry:
   `agents/learnerModellingAgent.js`, `models/AssessmentAttempt.js` (new), `models/index.js`,
   `controllers/assessmentController.js`, `controllers/courseController.js`, `controllers/learnerController.js`,
   `routes/learner.js`, frontend `screens/studentDashboard.jsx`.
+
+### 2026-09-30 — Content resource agent: preference-weighted dynamic feed (backend / agents)
+- **What happened:** Requirement: the content agent must generate dynamic content per the learner's preferred mode —
+  more YouTube videos for a video-mode learner, more audio for audio, more text for text. The prior 70/30 mix (see
+  earlier 2026-09-30 entry) already weighted the mix, but videos/audio were still the old deterministic placeholders;
+  recommenders only *ranked* catalogue items. Slas on-demand re-resolution on a per-request basis made the feed both
+  genuinely dynamic and preference-correct.
+- **Fix / prevention:**
+  - `recommendResources` now returns `{ recommendations, total, learningMode, preferredCount }`; every video item in
+    the mix is passed through `enrichVideoItem` (resolve + persist a real YouTube watch URL via `updateVideoMaterial`,
+    no-op when the material already has a real watch URL via `isRealWatchUrl`), and every audio item through
+    `enrichAudioItem` (ensures a `linkUrl`, generating a curated search URL when missing). Each recommendation gains a
+    `preferred` boolean so the UI can badge it.
+  - `resolveYouTubeVideo` fetch gets `AbortSignal.timeout(7000)` so a slow/hanging YouTube page can't stall the feed.
+  - Frontend `studentDashboard.jsx` gained a "Recommended for You" tab: fetches `GET /api/learner/recommendations`,
+    renders per-item type badges, a "Your style" flag on `preferred` items, media previews (YouTube iframe embed /
+    `<video>` for mp4 / "Listen now" audio link / document excerpt), the agent's reason, "Open in course →"
+    (`/courses/:courseId?module=<order>`) and "Set preference →" to `/learning-preferences`.
+- **Gotchas:**
+  - **Enrollment is gated; a scratch E2E that "enrolls" must create the row directly.** `POST /api/courses/enroll/:id`
+    only *starts* the assessment (`requiresAssessment: true`) — the `Enrollment` row (and thus
+    `priorKnowledge.enrolledCourses` driving the recommendations) is created only by `POST /api/assessment/submit`
+    (`assessmentController.js`: `Enrollment.findOrCreate({ where: {courseId, studentId}, defaults: {status:'active',
+    enrolledAt: new Date()} })`). First E2E returned `total: 0` for every mode because the enrollment never existed.
+    Fix: have the E2E script do the same `Enrollment.findOrCreate` with `status:'active'` (buildLearnerModel filters
+    `status: 'active'`).
+  - **Scratch scripts on Neon must `require('dotenv').config()` first** (same gotcha as the assessment E2E):
+    `config/database.js` reads env at module load, so a bare `require('./models')` throws "url argument must be a
+    string". `server.js` loads dotenv; standalone scripts must too.
+  - **On-demand enrichment only helps when the catalogue already holds playable media.** All 50 video materials now
+    hold real watch URLs, so enrichment short-circuits (`isRealWatchUrl`) — the feed is therefore fast AND correct in
+    production; the resolve path exists to self-heal any future module lacking a real URL.
+- **Verification:** backend E2E (boot + register + direct `Enrollment.findOrCreate` + `PUT /learner/preferences` for
+  each mode + `GET /learner/recommendations`): video mode → `{video:4, document:2, audio:2}` total 8,
+  `preferredCount` 4, all videos real `youtube.com/watch?v=` URLs; audio mode → `{audio:4, document:2, video:2}`;
+  text mode → `{document:4, audio:2, video:2}`; `learningMode` echoed; all type/URL/description assertions passed;
+  test user + enrollment deleted (`Assessment.destroy` → `Enrollment.destroy` → `User.destroy`). `preferredTypesOk`,
+  `videosOk`, `audiosOk`, `docsOk` all true. Frontend `npm run lint` + `npm run build` green (new bundle
+  `index-BceNDVur.js`). Scratch script deleted.
+- **Files involved:** backend `agents/contentResourceAgent.js`, frontend `screens/studentDashboard.jsx`.

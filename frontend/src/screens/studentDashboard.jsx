@@ -11,10 +11,83 @@ const ASSESSMENT_TIME_LIMIT = 120;
 
 const SECTIONS = [
   { id: 'courses', label: 'My Courses' },
+  { id: 'recommended', label: 'Recommended for You' },
   { id: 'tasks', label: 'Upcoming Tasks' },
   { id: 'results', label: 'Recent Results' },
   { id: 'available', label: 'Available Courses' },
 ];
+
+const TYPE_LABELS = { video: 'Video', audio: 'Audio', document: 'Text', link: 'Link', image: 'Image' };
+
+function videoEmbedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtu.be')) {
+      return `https://www.youtube.com/embed/${parsed.pathname.slice(1)}`;
+    }
+    if (parsed.hostname.includes('youtube.com')) {
+      const v = parsed.searchParams.get('v');
+      if (v) return `https://www.youtube.com/embed/${v}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function modeTypesLabel(mode) {
+  if (mode === 'video') return 'video';
+  if (mode === 'audio') return 'audio';
+  if (mode === 'text') return 'text';
+  return '';
+}
+
+function ResourceMedia({ rec }) {
+  if (rec.type === 'video') {
+    const embed = videoEmbedUrl(rec.videoUrl);
+    const isPlayable = /\.(mp4|webm|ogv|mov|m4v)$/i.test(rec.videoUrl || '');
+    if (embed) {
+      return (
+        <iframe
+          className="mt-3 aspect-video w-full rounded-xl border border-line bg-card"
+          src={embed}
+          title={rec.title}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      );
+    }
+    if (isPlayable) {
+      return <video className="mt-3 aspect-video w-full rounded-xl border border-line bg-card" controls preload="metadata" src={rec.videoUrl} />;
+    }
+    if (rec.linkUrl) {
+      return (
+        <a href={rec.linkUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-sm font-medium text-accent transition hover:bg-card-hover">
+          Watch lesson
+        </a>
+      );
+    }
+    return null;
+  }
+  if (rec.type === 'audio' && rec.linkUrl) {
+    return (
+      <a href={rec.linkUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-sm font-medium text-accent transition hover:bg-card-hover">
+        Listen now
+      </a>
+    );
+  }
+  if (rec.type === 'document' && rec.description) {
+    return <p className="mt-3 line-clamp-4 whitespace-pre-line text-sm leading-6 text-secondary">{rec.description}</p>;
+  }
+  if (rec.linkUrl) {
+    return (
+      <a href={rec.linkUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-sm font-medium text-accent transition hover:bg-card-hover">
+        Open material
+      </a>
+    );
+  }
+  return null;
+}
 
 
 function StudentDashboard() {
@@ -25,6 +98,8 @@ function StudentDashboard() {
   const [grades, setGrades] = useState([]);
   const [cgpa, setCgpa] = useState(null);
   const [availableCourses, setAvailableCourses] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
+  const [learningMode, setLearningMode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState('courses');
   const [submitting, setSubmitting] = useState(false);
@@ -57,14 +132,17 @@ function StudentDashboard() {
       api.get('/gradebook/my-grades').catch(() => ({ gradebooks: [] })),
       api.get('/gradebook/cgpa').catch(() => ({ cgpa: null })),
       api.get('/courses').catch(() => ({ courses: [] })),
+      api.get('/learner/recommendations').catch(() => ({ recommendations: [], learningMode: null })),
     ])
-      .then(([courseData, attemptData, gradeData, cgpaData, catalogData]) => {
+      .then(([courseData, attemptData, gradeData, cgpaData, catalogData, recData]) => {
         if (active) {
           setCourses(courseData.courses || []);
           setAttempts(attemptData.attempts || []);
           setGrades(gradeData.gradebooks || []);
           setCgpa(cgpaData.cgpa ?? null);
           setAvailableCourses(catalogData.courses || []);
+          setRecommendations(recData.recommendations || []);
+          setLearningMode(recData.learningMode || null);
         }
       })
       .finally(() => {
@@ -417,6 +495,77 @@ function StudentDashboard() {
             ) : (
               <p className="mt-6 text-sm text-muted">No courses available yet.</p>
             )}
+            </div>
+          )}
+
+          {section === 'recommended' && (
+            <div className="rounded-3xl border border-line bg-card p-6 backdrop-blur-xl sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Recommended for you</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    {learningMode
+                      ? `Picked in your preferred ${modeTypesLabel(learningMode)} learning format.`
+                      : 'Set your preferred way of learning to personalise these picks.'}
+                  </p>
+                </div>
+                {!learningMode && (
+                  <button
+                    onClick={() => navigate('/learning-preferences')}
+                    className="shrink-0 text-sm font-semibold text-accent transition hover:text-accent-soft"
+                  >
+                    Set preference →
+                  </button>
+                )}
+              </div>
+              {loading ? (
+                <p className="mt-6 text-sm text-muted">Loading recommendations...</p>
+              ) : recommendations.length > 0 ? (
+                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {recommendations.map((rec) => (
+                    <div
+                      key={rec.materialId}
+                      className={`flex flex-col rounded-2xl border bg-card-deep p-5 transition hover:bg-card-hover ${
+                        rec.preferred ? 'border-orange-400/30' : 'border-line'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                            rec.preferred
+                              ? 'border-orange-400/40 bg-orange-400/10 text-accent-soft'
+                              : 'border-line bg-card text-muted'
+                          }`}
+                        >
+                          {TYPE_LABELS[rec.type] || rec.type}
+                        </span>
+                        {rec.preferred && (
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-accent-mid">Your style</span>
+                        )}
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-content">{rec.title}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {rec.courseTitle}
+                        {rec.moduleOrder ? ` · Module ${rec.moduleOrder}` : ''}
+                      </p>
+                      <ResourceMedia rec={rec} />
+                      <p className="mt-3 rounded-lg bg-card px-3 py-2 text-xs text-muted">{rec.reason}</p>
+                      <button
+                        onClick={() =>
+                          navigate(rec.moduleOrder ? `/courses/${rec.courseId}?module=${rec.moduleOrder}` : `/courses/${rec.courseId}`)
+                        }
+                        className="mt-4 w-full rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent-soft transition hover:bg-accent/20"
+                      >
+                        Open in course →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-6 text-sm text-muted">
+                  No recommendations yet. Enroll in a course and take the placement assessment to unlock personalised content.
+                </p>
+              )}
             </div>
           )}
 
