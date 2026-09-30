@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { userStore } from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
+import { useSidebar } from '../component/useSidebar.js';
 import WelcomeHeading from '../component/welcomeHeading.jsx';
 import adminHeroImg from '../assets/admin-hero.jpg';
 
 function AdminDashboard() {
+  const { collapsed } = useSidebar();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,7 +53,7 @@ function AdminDashboard() {
     <div className='relative min-h-screen bg-page text-content'>
       <div className='pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]' />
       <Sidebar />
-      <div className='relative p-6 pt-20 lg:p-8 md:pt-6 md:ml-72'>
+      <div className={`relative p-6 pt-20 lg:p-8 md:pt-6 ${collapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         <div className='mx-auto max-w-7xl space-y-6'>
           {/* Header */}
           <header className='shadow-panel relative overflow-hidden rounded-2xl border border-line bg-card p-6 sm:flex-row sm:items-center sm:justify-between'>

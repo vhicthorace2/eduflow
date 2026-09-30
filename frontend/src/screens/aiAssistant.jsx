@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
+import { useSidebar } from '../component/useSidebar.js';
 import BackButton from '../component/backButton.jsx';
 import {
   SparklesIcon,
@@ -29,6 +30,7 @@ const SUGGESTIONS = [
 ];
 
 function AiAssistant() {
+  const { collapsed } = useSidebar();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
@@ -148,7 +150,7 @@ function AiAssistant() {
     <div className="relative min-h-screen bg-page text-content">
       <div className="pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]" />
       <Sidebar />
-      <div className="relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 md:ml-72">
+      <div className={`relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 ${collapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         <div className="mx-auto max-w-5xl space-y-6">
           <div><BackButton /></div>
 

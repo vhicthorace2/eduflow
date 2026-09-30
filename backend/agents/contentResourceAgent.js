@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { Course, Module, Material, ActivityLog } = require('../models');
 
 const MAX_RECOMMENDATIONS = 8;
+const PREFERRED_SHARE = 0.7;
 const DIFFICULTY_WEIGHT = 30;
 const NEW_MATERIAL_WEIGHT = 20;
 const ENROLLED_WEIGHT = 10;
@@ -69,7 +70,6 @@ async function recommendResources({ studentId, learnerModel } = {}) {
   }
 
   const whereClause = { isActive: true, courseId: { [Op.in]: [...engagedCourseIds] } };
-  if (preferredTypes) whereClause.type = { [Op.in]: preferredTypes };
 
   const materials = await Material.findAll({
     where: whereClause,
@@ -144,10 +144,35 @@ async function recommendResources({ studentId, learnerModel } = {}) {
         score
       };
     })
-    .sort((a, b) => b.score - a.score || (a.moduleOrder || 0) - (b.moduleOrder || 0))
-    .slice(0, MAX_RECOMMENDATIONS);
+    .sort((a, b) => b.score - a.score || (a.moduleOrder || 0) - (b.moduleOrder || 0));
 
-  return { recommendations: ranked, total: ranked.length };
+  // Mix the stream so that ~70% of what the student receives matches their
+  // preferred learning mode and the remaining ~30% keeps other formats in
+  // rotation. Ordering stays score-driven; preferred items beyond the 70% cap
+  // are used only to top up shortfalls from other formats.
+  let mix = [];
+  let preferredTaken = 0;
+  const targetPreferred = Math.ceil(MAX_RECOMMENDATIONS * PREFERRED_SHARE);
+  const deferredPreferred = [];
+
+  for (const item of ranked) {
+    if (mix.length >= MAX_RECOMMENDATIONS) break;
+    if (preferredTypes && preferredTypes.includes(item.type)) {
+      if (preferredTaken < targetPreferred) {
+        preferredTaken++;
+        mix.push(item);
+      } else {
+        deferredPreferred.push(item);
+      }
+    } else {
+      mix.push(item);
+    }
+  }
+  if (mix.length < MAX_RECOMMENDATIONS) {
+    mix = mix.concat(deferredPreferred.slice(0, MAX_RECOMMENDATIONS - mix.length));
+  }
+
+  return { recommendations: mix, total: mix.length };
 }
 
 /**

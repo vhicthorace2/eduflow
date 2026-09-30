@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
+import { useSidebar } from '../component/useSidebar.js';
 import BackButton from '../component/backButton.jsx';
 import { courseCover } from '../component/courseCovers.js';
 import lectureImg from '../assets/lecture.jpg';
@@ -107,6 +108,7 @@ function QuestionBuilder({ questions, onChange }) {
 }
 
 function InstructorContent() {
+  const { collapsed } = useSidebar();
   const [courses, setCourses] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [tab, setTab] = useState('lessons');
@@ -360,7 +362,7 @@ function InstructorContent() {
     <div className='relative min-h-screen bg-page text-content'>
       <div className='pointer-events-none absolute -left-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]' />
       <Sidebar />
-      <div className='relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 md:ml-72'>
+      <div className={`relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 ${collapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         <div className='mx-auto max-w-6xl space-y-6'>
           <div>
             <BackButton />

@@ -707,6 +707,53 @@ When you start, finish, or reprioritize work, update this file.
   provided, `resolveYouTubeVideo` is the single place to swap in the official
   `search.list` call.
 
+### 2026-09-29 — Collapsible sidebar for all screens
+- **Status:** completed
+- **Summary:** Desktop sidebar now collapses to an icon-only rail with a toggle;
+  the preference persists in localStorage and applies to all 12 sidebar screens.
+- **Details:**
+  - `useSidebar.js` (new): `SidebarContext`, `useSidebar()`, localStorage read/persist
+    (`eduflow_sidebar_collapsed`).
+  - `sidebar.jsx`: `SidebarProvider` export + `Sidebar` collapse behavior —
+    `md:w-20` rail, double-chevron toggle, labels/name hidden when collapsed with
+    `title` tooltips, `transition-all` width animation. Mobile drawer unchanged.
+  - `App.jsx`: routes wrapped in `SidebarProvider`.
+  - 12 screens consume `useSidebar()` and switch their content gutter
+    `md:ml-72` ↔ `md:ml-20` accordingly.
+- **Files:** frontend `component/useSidebar.js` (new), `component/sidebar.jsx`,
+  `App.jsx`, `screens/{studentDashboard,settings,messages,manageUsers,manageCourses,
+  courseConsistency,learningPreferences,aiAssistant,leaderboard,adminDashboard,
+  instructorDashboad,instructorContent}.jsx`
+- **Follow-up:** verify visually in dev on md+ (toggle, rail widths, tooltips).
+  Untouched: mobile drawer behavior, all routes/roles.
+
+### 2026-09-30 — Content recommendations: ~70% in the learner's preferred mode + new-user onboarding pop-up + full-width course screen
+- **Status:** completed
+- **Summary:** Three frontend/backend features shipped and verified together: (1) the content resource agent now
+  serves ~70% of recommendations in the student's preferred learning mode (remainder = other-format variety);
+  (2) a one-time step-by-step onboarding pop-up for new users; (3) course-details content spans 100% width with the
+  instructor profile compact at the top.
+- **Details:**
+  - **70/30 mix** (`backend/agents/contentResourceAgent.js`): removed the preferred-type-only catalogue filter; added
+    `PREFERRED_SHARE = 0.7` and a post-ranking mix that caps preferred items at `Math.ceil(8 * 0.7) = 6`, fills to 8
+    with non-preferred types, and tops up shortfalls from deferred preferred items. No frontend screen renders
+    `/api/learner/recommendations`, so the change is backend-only.
+  - **Onboarding pop-up** (`frontend/src/component/onboarding.jsx` new, `src/App.jsx`): 4-step modal
+    (Welcome / Enroll in a course / Learn your way / Stay on track), prev/next/skip/done, progress dots, one-time per
+    user via `localStorage['eduflow_onboarding_<userId>']`; mounted inside `SidebarProvider`.
+  - **Course screen** (`frontend/src/screens/coursesDetails.jsx`): hero instructor card gained the email line; the
+    long right-column Instructor card was removed; the content grid `lg:grid-cols-[1.2fr_0.8fr]` became
+    `space-y-8` full-width. A stray duplicated `</>` `)}` `</main>` from the structural edit was caught in `git diff`
+    and removed.
+- **Verified:** backend E2E (boot on port 5000 + register + preferences + enrollment + recommendations): video mode
+  → 5/8 video (all 5 available) + 3 others; text mode → 5/8 document + 3 others; totals always 8; preferred count
+  equals `min(6, availablePreferred)`; test user/enrollment cleaned. Frontend `npm run lint` clean +
+  `npm run build` green.
+- **Files:** backend `agents/contentResourceAgent.js`; frontend `component/onboarding.jsx` (new), `App.jsx`,
+  `screens/coursesDetails.jsx`.
+- **Follow-up:** set `GROQ_API_KEY` in `backend/.env` (free at console.groq.com) to activate real LLM generations —
+  currently all agents run their offline/bank fallbacks (401 at Groq caught).
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure

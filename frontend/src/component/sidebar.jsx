@@ -1,8 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from '@heroicons/react/24/outline';
 import ThemeToggle from './theme.jsx';
 import { userStore } from '../api/client.js';
+import { SidebarContext, readSidebarCollapsed, persistSidebarCollapsed, useSidebar } from './useSidebar.js';
+
+export function SidebarProvider({ children }) {
+  const [collapsed, setCollapsed] = useState(readSidebarCollapsed);
+  const toggleCollapsed = () => setCollapsed((c) => !c);
+  useEffect(() => {
+    persistSidebarCollapsed(collapsed);
+  }, [collapsed]);
+  return (
+    <SidebarContext.Provider value={{ collapsed, toggleCollapsed }}>
+      {children}
+    </SidebarContext.Provider>
+  );
+}
 
 const ICONS = {
   dashboard: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
@@ -63,6 +77,7 @@ function Sidebar() {
 
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+  const { collapsed, toggleCollapsed } = useSidebar();
 
   return (
     <>
@@ -79,12 +94,21 @@ function Sidebar() {
         <div aria-hidden="true" onClick={close} className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm md:hidden" />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col border-r border-line bg-page-solid text-content shadow-xl backdrop-blur-xl transition-transform duration-200 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className='flex items-center justify-between border-b border-line px-6 py-6'>
-          <div>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-line bg-page-solid text-content shadow-xl backdrop-blur-xl transition-all duration-200 md:translate-x-0 ${collapsed ? 'md:w-20' : 'md:w-72'} ${open ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`flex items-center justify-between border-b border-line px-6 py-6 ${collapsed ? 'md:justify-center md:px-2' : ''}`}>
+          <div className={collapsed ? 'md:hidden' : ''}>
             <h2 className='font-display text-xl font-semibold tracking-tight'>EduFlow</h2>
             <p className='mt-2 text-sm text-muted'>{PORTAL_NAME[role] || PORTAL_NAME.student}</p>
           </div>
+          <button
+            type="button"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={toggleCollapsed}
+            className="hidden h-10 w-10 items-center justify-center rounded-lg text-muted transition hover:bg-card-hover hover:text-content md:flex"
+          >
+            {collapsed ? <ChevronDoubleRightIcon className="h-5 w-5" /> : <ChevronDoubleLeftIcon className="h-5 w-5" />}
+          </button>
           <button
             type="button"
             aria-label="Close navigation menu"
@@ -102,30 +126,31 @@ function Sidebar() {
                 <NavLink
                   to={link.to}
                   onClick={close}
+                  title={collapsed ? link.name : undefined}
                   className={({ isActive }) =>
-                    `flex items-center rounded-xl px-4 py-3 text-sm font-medium transition ${
+                    `flex items-center rounded-xl px-4 py-3 text-sm font-medium transition ${collapsed ? 'md:justify-center md:px-2' : ''} ${
                       isActive
                         ? 'bg-orange-500/15 text-accent shadow-md ring-1 ring-inset ring-orange-400/30'
                         : 'text-muted hover:bg-card-hover hover:text-content'
                     }`
                   }
                 >
-                  <svg className='mr-3 h-5 w-5' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round'>
+                  <svg className={`h-5 w-5 shrink-0 ${collapsed ? 'md:mr-0' : 'mr-3'}`} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round'>
                     <path d={link.icon} />
                   </svg>
-                  {link.name}
+                  <span className={collapsed ? 'md:hidden' : ''}>{link.name}</span>
                 </NavLink>
               </li>
             ))}
           </ul>
         </nav>
 
-        <div className='border-t border-line p-4'>
-          <div className='flex items-center rounded-xl border border-line bg-card p-3 backdrop-blur-md'>
-            <div className='flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/20 font-semibold text-accent-soft ring-1 ring-inset ring-orange-400/30'>
+        <div className={`border-t border-line p-4 ${collapsed ? 'md:px-2' : ''}`}>
+          <div className={`flex items-center rounded-xl border border-line bg-card p-3 backdrop-blur-md ${collapsed ? 'md:flex-col md:gap-3 md:py-4' : ''}`}>
+            <div className='flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/20 font-semibold text-accent-soft ring-1 ring-inset ring-orange-400/30' title={collapsed ? user?.name || 'Learner' : undefined}>
               {initials || '?'}
             </div>
-            <div className='ml-3 flex-1 min-w-0'>
+            <div className={`ml-3 flex-1 min-w-0 ${collapsed ? 'md:hidden md:ml-0' : ''}`}>
               <p className='truncate text-sm font-semibold'>{user?.name || 'Learner'}</p>
               <p className='text-xs text-muted capitalize'>{user?.role || 'student'}</p>
             </div>

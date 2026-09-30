@@ -787,3 +787,78 @@ Format per entry:
 - **Files involved:** backend `agents/contentResourceAgent.js`, backend `agents/assessmentAgent.js`,
   backend `controllers/courseController.js`, backend `scripts/attachCourseVideos.js`,
   backend `scripts/generateCourseContent.js`, backend `package.json`.
+
+### 2026-09-29 — Collapsible sidebar shared across every dashboard screen (frontend / layout)
+- **What happened:** The fixed `w-72` desktop sidebar forced every screen to reserve exactly `md:ml-72` of
+  gutter; there was no way to collapse it, so 12 screens hardcoded that margin. Requirement: collapsible
+  sidebar for all screens.
+- **Fix / prevention:**
+  - New `src/component/useSidebar.js`: `SidebarContext` + `useSidebar()` + localStorage persistence
+    (`readSidebarCollapsed`/`persistSidebarCollapsed`, key `eduflow_sidebar_collapsed`).
+  - `SidebarProvider` lives in `src/component/sidebar.jsx` (kept with its components so the react-refresh
+    eslint rule never sees a non-component export in a component file), wrapping `<Routes>` in `App.jsx`.
+  - `Sidebar`: on `md+` collapses to an icon rail (`w-72` → `w-20`) with a ChevronDouble toggle in the
+    header, labels/portal-name/name block hidden via `md:hidden`, `title` tooltips on links + avatar,
+    `transition-all` animates the width. Mobile drawer behavior unchanged.
+  - All 12 sidebar screens read `const { collapsed } = useSidebar()` and render
+    `${collapsed ? 'md:ml-20' : 'md:ml-72'}` on their content wrapper. `md:ml-20` (5rem) exactly matches
+    the collapsed `w-20` rail; use the SAME spacing on both sides or content drifts.
+- **Gotcha — collapse state is app-wide, not per screen:** because the provider wraps all routes, collapsing
+  on one screen persists across navigation (and reloads) for every role — that's intended here ("for all
+  screens"), but keep it in mind if per-route or per-role defaults are wanted later.
+- **Verification:** `npm run lint` clean, `npm run build` succeeds (`✓ built`). No runtime DOM check was
+  performed this pass beyond build; collapse toggles render server-agnostically from localStorage.
+- **Files involved:** frontend `src/component/useSidebar.js` (new), `src/component/sidebar.jsx`,
+  `src/App.jsx`, and 12 screens (`studentDashboard`, `settings`, `messages`, `manageUsers`,
+  `manageCourses`, `courseConsistency`, `learningPreferences`, `aiAssistant`, `leaderboard`,
+  `adminDashboard`, `instructorDashboad`, `instructorContent`).
+
+### 2026-09-30 — Content resource agent: ~70% of recommendations target the learner's preferred mode (backend / agents)
+- **What happened:** Learner-set `learningMode` (text/audio/video) previously FILTERED the catalogue to the preferred
+  types only, so a video-mode learner never saw anything but videos. Requirement: the agent should give the student
+  ~70% of course content in their mode while keeping ~30% as other-format variety.
+- **Fix / prevention:** `recommendResources` now scores the FULL enrolled-catalogue (no `whereClause.type` filter when
+  `preferredTypes` exists), then a post-ranking mix caps top-picked preferred items at `Math.ceil(MAX_RECOMMENDATIONS *
+  PREFERRED_SHARE)` (`8 * 0.7 = 6`), fills the rest up to 8 with non-preferred items, and tops up shortfalls from
+  deferred preferred items (`deferredPreferred.slice(0, 8 - mix.length)`). Ordering stays score-driven; the share is
+  a cap, not a guarantee, when the pool has fewer preferred items than the target.
+- **Gotcha — 70% is unreachable when preferred availability is low:** with 5 video / 5 audio / 5 document materials per
+  course, `min(6, available)` is 5, so a video-mode single-course learner gets 5/8 (63%) — that is the correct "fill to
+  the cap" behavior, NOT a bug. Verify against `preferredCount === Math.min(ceil(0.7N), availablePreferred)`, never a
+  hard 70% assertion.
+- **Gotcha — health probe key:** `GET /api/health` returns `{ success: true }`, NOT `status: 'ok'`; a boot-wait loop
+  that checks `$r.status` never turns true. On Neon, Sequelize `sync()` takes ~40s (many `information_schema` queries),
+  so wait loops must be long (≥75s) and keyed on `$r.success`.
+- **Verification:** E2E (boot + register + `PUT /learner/preferences` + direct enrollment + `GET /learner/recommendations`):
+  video mode → 5/8 video (all 5 available) + 3 others; text mode → 5/8 document (all 5 available) + 3 others; totals stay
+  8. Test user + enrollment cleaned; scratch script deleted.
+- **Files involved:** backend `agents/contentResourceAgent.js`.
+
+### 2026-09-30 — Onboarding guide pop-up for new users (frontend / onboarding)
+- **What happened:** New users had no guidance on how to use the app after signup. Requirement: a small step-by-step
+  pop-up walking a new user through the app.
+- **Fix / prevention:** New `src/component/onboarding.jsx` renders a 4-step modal (Welcome / Enroll in a course / Learn
+  your way / Stay on track) with progress dots, prev/next/skip/done, and a one-time dismiss guard via
+  `localStorage['eduflow_onboarding_<userId>']`. Mounted in `App.jsx` inside `SidebarProvider` (so it can use hooks
+  under providers and never blocks unauthenticated routes).
+- **Gotcha — one-time-per-user storage key:** keying the flag by plain user id keeps onboarding one-time per account
+  while a shared key would hide it for every later user on the same device.
+- **Verification:** `npm run lint` clean; `npm run build` succeeds (component path transforms). Not yet opened in a real
+  browser to eyeball the modal.
+- **Files involved:** frontend `src/component/onboarding.jsx` (new), `src/App.jsx`.
+
+### 2026-09-30 — Course screen: instructor details compact at top, content full-width (frontend / layout)
+- **What happened:** The course-details hero already showed a compact instructor card, but a tall "Instructor" card in the
+  right column stretched the course screen and left the content in a narrow `grid-cols-[1.2fr_0.8fr]` column.
+  Requirement: content at 100% width and instructor details kept at the top, not a long side section.
+- **Fix / prevention:** Added the instructor email line to the hero card (top). Replaced
+  `<section class="mt-10 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">` with `<section class="mt-10 space-y-8">` and deleted the
+  right-column Instructor card + its wrapper, so About + Course Content span the full width. An inner
+  `<div className="space-y-8">` wrapper remains (harmless redundancy).
+- **Gotcha — delete a card's wrapper but keep the close-tag count balanced:** removing the instructor `<div>` and its
+  `</section>` must replace with exactly one `</div>` (the left-column close) + `</section>`; the diff review showed a
+  stray duplicate `</>` + `)}` + `</main>` had been introduced (end-of-file read: single `</main>` expected). Always
+  `git diff` the tail of a structurally-edited JSX file and count openers/closers before relying on the build.
+- **Verification:** `git diff` confirmed only intended lines changed; end-of-file now has exactly one `</>` `)}` `</main>`;
+  `npm run lint` clean; `npm run build` succeeds.
+- **Files involved:** frontend `src/screens/coursesDetails.jsx`.

@@ -407,13 +407,16 @@ function CourseDetails() {
                   <p className="mt-2 text-xl font-semibold">
                     {course.instructor?.name || 'TBA'}
                   </p>
+                  {course.instructor?.email && (
+                    <p className="mt-1 truncate text-sm text-slate-400">{course.instructor.email}</p>
+                  )}
                 </div>
               </div>
             </section>
 
             <PaceBanner path={path} onContinue={continueToRecommended} />
 
-            <section className="mt-10 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+            <section className="mt-10 space-y-8">
               <div className="space-y-8">
                 <div className="shadow-panel rounded-3xl border border-line bg-card p-8">
                   <h2 className="font-display text-2xl font-medium tracking-tight">About this course</h2>
@@ -502,23 +505,6 @@ function CourseDetails() {
                       Modules and materials are managed by the instructor.
                     </div>
                   )}
-                </div>
-              </div>
-
-              <div className="shadow-panel rounded-3xl border border-line bg-card p-8">
-                <h2 className="font-display text-2xl font-medium tracking-tight">Instructor</h2>
-                <div className="mt-6 flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-400/20 font-semibold text-accent-soft ring-1 ring-inset ring-orange-400/30">
-                    {(course.instructor?.name || '?').charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-content">
-                      {course.instructor?.name || 'TBA'}
-                    </h4>
-                    <p className="text-sm text-muted">
-                      {course.instructor?.email || 'Instructor'}
-                    </p>
-                  </div>
                 </div>
               </div>
             </section>

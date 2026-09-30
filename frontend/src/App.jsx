@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { userStore } from './api/client.js';
+import { SidebarProvider } from './component/sidebar.jsx';
+import OnboardingGuide from './component/onboarding.jsx';
 import Home from './screens/home.jsx';
 import CourseCatalog from './screens/courseCatalog.jsx';
 import InstructorDashboard from './screens/instructorDashboad.jsx';
@@ -44,8 +46,9 @@ function RequireRole({ roles, children }) {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
+    <SidebarProvider>
+      <Routes>
+        <Route path="/" element={<Home />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
       <Route path="/profile" element={<Profile />} />
@@ -142,7 +145,9 @@ function App() {
         }
       />
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+      <OnboardingGuide />
+    </SidebarProvider>
   );
 }
 

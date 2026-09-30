@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api, { userStore, tokenStore } from '../api/client.js';
 import Sidebar from '../component/sidebar.jsx';
+import { useSidebar } from '../component/useSidebar.js';
 import BackButton from '../component/backButton.jsx';
 import { useTheme } from '../component/themeContext.js';
 import ThemeToggle from '../component/theme.jsx';
@@ -13,6 +14,7 @@ const inputClass = 'w-full rounded-xl border border-line bg-card-deep px-4 py-3 
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.2em] text-faint';
 
 function Settings() {
+  const { collapsed } = useSidebar();
   const user = userStore.get();
   const { theme, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -157,7 +159,7 @@ function Settings() {
     <div className="relative min-h-screen bg-page text-content">
       <div className="pointer-events-none absolute -right-40 top-0 h-[24rem] w-[24rem] rounded-full bg-orange-500/10 blur-[120px]" />
       <Sidebar />
-      <div className="relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 md:ml-72">
+      <div className={`relative px-6 pb-10 pt-20 sm:px-8 md:pt-10 lg:px-16 ${collapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         <div className="mx-auto max-w-4xl space-y-6">
           <div>
             <BackButton />
