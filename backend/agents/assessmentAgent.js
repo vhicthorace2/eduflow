@@ -2,6 +2,28 @@ const { client, defaultModel } = require('../services/openaiservices.js');
 
 const QUESTION_COUNT = 10;
 
+const STOP_WORDS = new Set(['a', 'an', 'the', 'of', 'for', 'and', 'with', 'in', 'on', 'to', 'vs', 'using', 'based', 'for']);
+
+/**
+ * Short topical label per question, aligned by index with each course bank and
+ * the generic fallback. These drive weakness analysis and module recommendations.
+ */
+const bankTopics = {
+  'backend web application development': ['HTTP basics', 'HTTP methods', 'HTTP status codes', 'Express middleware', 'Sequelize queries', 'Sequelize associations', 'Password hashing', 'JWT & sessions', 'Authentication headers', 'Role-based access control'],
+  'frontend web development with react': ['JSX fundamentals', 'React state', 'React effects', 'React props', 'React Router', 'React lists', 'Vite tooling', 'JSX expressions', 'React Router', 'Tailwind styling'],
+  'ui/ux design systems': ['Design principles', 'Design tokens', 'Design tokens', 'Accessibility', 'Component systems', 'Prototyping', 'Design tokens', 'Component systems', 'Design principles', 'Prototyping tools'],
+  'game development with unity': ['Unity fundamentals', 'Unity scripting', 'Unity physics', 'Unity workflows', 'Unity events', 'Unity scripting', 'Unity scripting', 'Unity physics', 'Unity physics', 'Unity workflows'],
+  'database systems with sql': ['SQL querying', 'SQL schema', 'SQL joins', 'SQL aggregation', 'SQL aggregation', 'SQL design', 'SQL performance', 'SQL querying', 'SQL transactions', 'SQL transactions'],
+  'soe 504 (fault tolerant computing)': ['Fault tolerance concepts', 'Redundancy', 'Redundancy', 'Fault detection', 'Fault detection', 'Consensus', 'Resilience patterns', 'Resilience patterns', 'Fault tolerant design', 'Consensus'],
+  'soe 506 (game design and development unity)': ['Unity fundamentals', 'Unity scripting', 'Unity workflows', 'Unity physics', 'Unity events', 'Unity scripting', 'Unity workflows', 'Game feel', 'Unity physics', 'Unity physics'],
+  'soe 508 (special topics in software engineering)': ['Service architecture', 'Service architecture', 'Continuous integration', 'Continuous deployment', 'Infrastructure as code', 'Containers', 'Containers', 'Application design', 'Security fundamentals', 'Security fundamentals'],
+  'soe 510 (mobile app development using flutter)': ['Dart & Flutter basics', 'Flutter widgets', 'Flutter widgets', 'Flutter state', 'Flutter layout', 'Flutter layout', 'Flutter state', 'Flutter persistence', 'Flutter navigation', 'Flutter release'],
+  'soe 512 (embedded systems)': ['Microcontrollers', 'C for embedded', 'Embedded I/O', 'Embedded I/O', 'Embedded buses', 'Real-time systems', 'RTOS', 'Interrupts', 'RTOS', 'Interrupts'],
+  'soe 514 (website app development using java)': ['Java web servers', 'Java build tooling', 'Java web views', 'Java MVC pattern', 'Spring REST', 'JPA data', 'Spring Data', 'Spring transactions', 'Spring security', 'Java build tooling']
+};
+
+const genericTopics = ['Web fundamentals', 'Web fundamentals', 'Web fundamentals', 'Web fundamentals', 'Web fundamentals', 'JavaScript', 'JavaScript', 'JavaScript', 'Web fundamentals', 'JavaScript'];
+
 function normalizeQuestions(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -185,8 +207,42 @@ function findBank(course) {
   return null;
 }
 
+function findBankKey(course) {
+  const normalized = String(course || '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (courseBanks[normalized]) return normalized;
+  for (const key of Object.keys(courseBanks)) {
+    if (normalized.includes(key) || key.includes(normalized)) return key;
+  }
+  return null;
+}
+
+function resolveBank(course) {
+  const key = findBankKey(course);
+  if (key) {
+    return {
+      questions: normalizeQuestions(courseBanks[key]),
+      topics: [...(bankTopics[key] || [])]
+    };
+  }
+  return {
+    questions: normalizeQuestions(genericQuestions),
+    topics: [...genericTopics]
+  };
+}
+
 async function generateAssessment(course) {
-  const bank = normalizeQuestions(findBank(course) || genericQuestions);
+  const { questions } = await pickQuestions(course);
+  return questions;
+}
+
+/**
+ * Pick exactly QUESTION_COUNT questions for the course together with their
+ * aligned topical labels. Prefers the LLM when a client is configured and
+ * falls back to the deterministic course bank/generic set (offline mode).
+ */
+async function pickQuestions(course) {
+  const bank = resolveBank(course);
 
   if (client) {
     try {
@@ -199,32 +255,107 @@ async function generateAssessment(course) {
       const parsed = JSON.parse(text.replace(/^```json\s*|\s*```$/g, '').trim());
 
       const generated = normalizeQuestions(parsed);
+      const genTopics = generated.map(() => null);
       if (generated.length >= QUESTION_COUNT) {
-        return generated.slice(0, QUESTION_COUNT);
+        return {
+          questions: generated.slice(0, QUESTION_COUNT),
+          topics: genTopics.slice(0, QUESTION_COUNT)
+        };
       }
       if (generated.length > 0) {
-        return [...generated, ...bank].slice(0, QUESTION_COUNT);
+        return {
+          questions: [...generated, ...bank.questions].slice(0, QUESTION_COUNT),
+          topics: [...genTopics, ...bank.topics].slice(0, QUESTION_COUNT)
+        };
       }
     } catch (error) {
       // fall through to the course bank below
     }
   }
 
-  return bank.slice(0, QUESTION_COUNT);
+  return {
+    questions: bank.questions.slice(0, QUESTION_COUNT),
+    topics: bank.topics.slice(0, QUESTION_COUNT)
+  };
+}
+
+function topicMatchScore(topic, moduleTitle) {
+  const t = String(topic || '').trim().toLowerCase();
+  const m = String(moduleTitle || '').trim().toLowerCase();
+  if (!t || !m) return 0;
+  let score = (m.includes(t) || t.includes(m)) ? 2 : 0;
+  const tokens = t.split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+  for (const token of tokens) {
+    if (m.includes(token)) score += 1;
+  }
+  return score;
 }
 
 /**
- * Generate a placement test for a student on a given course: exactly
- * QUESTION_COUNT (10) questions together with the answer key, so the caller
- * can present the questions client-side and score the submission server-side
- * against `correctAnswers`.
+ * Map each question to the course module that best matches its topic label.
+ * Unmatched questions are balanced across modules so every module is covered.
  */
-async function generateStudentTest(course) {
-  const questions = await generateAssessment(course);
+function mapQuestionsToModules(questions, topics, modules) {
+  const list = Array.isArray(modules) ? modules.filter(Boolean) : [];
+  const mapped = questions.map((q, index) => {
+    const topic = topics[index] || null;
+    let best = null;
+    let bestScore = 0;
+    for (const module of list) {
+      const score = topicMatchScore(topic, module.title);
+      if (score > bestScore) {
+        bestScore = score;
+        best = module;
+      }
+    }
+    return {
+      question: q,
+      topic,
+      moduleOrder: best ? best.order : null,
+      moduleTitle: best ? best.title : null
+    };
+  });
+
+  if (list.length > 0) {
+    const counts = new Map(list.map((m) => [m.order, 0]));
+    for (const item of mapped) {
+      if (item.moduleOrder == null) {
+        const target = [...counts.entries()].sort((a, b) => a[1] - b[1] || a[0] - b[0])[0][0];
+        const module = list.find((m) => m.order === target);
+        item.moduleOrder = module.order;
+        item.moduleTitle = module.title;
+        counts.set(target, counts.get(target) + 1);
+      } else {
+        counts.set(item.moduleOrder, (counts.get(item.moduleOrder) || 0) + 1);
+      }
+    }
+  }
+
+  return mapped;
+}
+
+/**
+ * Generate a timed placement test for a student on a given course: exactly
+ * QUESTION_COUNT (10) questions tagged with a topical label and the course
+ * module each question covers, plus the answer key so the caller can present
+ * the questions client-side and score the submission server-side.
+ */
+async function generateStudentTest(course, modules) {
+  const { questions, topics } = await pickQuestions(course);
+  const moduleList = Array.isArray(modules) ? modules.filter(Boolean) : [];
+  const tagged = mapQuestionsToModules(questions, topics, moduleList);
+  const finalQuestions = tagged.map(({ question, topic, moduleOrder, moduleTitle }) => ({
+    ...question,
+    topic,
+    moduleOrder,
+    moduleTitle
+  }));
+
   return {
-    count: questions.length,
-    questions,
-    correctAnswers: questions.map((q) => q.correctAnswer)
+    count: finalQuestions.length,
+    questions: finalQuestions,
+    correctAnswers: finalQuestions.map((q) => q.correctAnswer),
+    modules: moduleList.map((m) => ({ id: m.id, order: m.order, title: m.title }))
   };
 }
 

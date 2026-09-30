@@ -4,6 +4,7 @@ const {
   Course,
   Enrollment,
   QuizAttempt,
+  AssessmentAttempt,
   Submission,
   ActivityLog
 } = require('../models');
@@ -20,7 +21,7 @@ const MASTERY_RATE = 80;
  * Pure data aggregation; deterministic, no external model calls.
  */
 async function buildLearnerModel(studentId) {
-  const [user, enrollments, quizAttempts, submissions, activityLogs] = await Promise.all([
+  const [user, enrollments, quizAttempts, assessmentAttempts, submissions, activityLogs] = await Promise.all([
     User.findByPk(studentId),
     Enrollment.findAll({
       where: { studentId, status: 'active' },
@@ -33,6 +34,10 @@ async function buildLearnerModel(studentId) {
       ]
     }),
     QuizAttempt.findAll({
+      where: { studentId },
+      order: [['completedAt', 'DESC']]
+    }),
+    AssessmentAttempt.findAll({
       where: { studentId },
       order: [['completedAt', 'DESC']]
     }),
@@ -53,11 +58,58 @@ async function buildLearnerModel(studentId) {
     : null;
   const passedCount = quizAttempts.filter((attempt) => attempt.passed).length;
 
+  const assessmentPercentages = assessmentAttempts.map((attempt) => Number(attempt.percentage));
+  const averageAssessmentPercentage = assessmentPercentages.length
+    ? Math.round(assessmentPercentages.reduce((sum, value) => sum + value, 0) / assessmentPercentages.length)
+    : null;
+  const passedAssessmentCount = assessmentAttempts.filter((attempt) => attempt.passed).length;
+
   const performanceByCourse = quizAttempts.reduce((map, attempt) => {
     if (!map.has(attempt.courseId)) map.set(attempt.courseId, []);
     map.get(attempt.courseId).push(Number(attempt.percentage));
     return map;
   }, new Map());
+
+  assessmentAttempts.forEach((attempt) => {
+    if (!performanceByCourse.has(attempt.courseId)) performanceByCourse.set(attempt.courseId, []);
+    performanceByCourse.get(attempt.courseId).push(Number(attempt.percentage));
+  });
+
+  // Weak areas surfaced from assessment attempts: modules where questions were
+  // missed, with the topics to review. This is the structured report the
+  // assessment agent routes into the learner model.
+  const weaknessByModule = new Map();
+  assessmentAttempts.forEach((attempt) => {
+    const list = Array.isArray(attempt.weaknesses) ? attempt.weaknesses : [];
+    list.forEach((w) => {
+      if (w == null || w.moduleOrder == null) return;
+      const key = `${attempt.courseId}:${w.moduleOrder}`;
+      const entry = weaknessByModule.get(key) || {
+        courseId: attempt.courseId,
+        moduleOrder: w.moduleOrder,
+        moduleTitle: w.moduleTitle || null,
+        missed: 0,
+        topics: new Set()
+      };
+      entry.missed += 1;
+      if (w.topic) entry.topics.add(w.topic);
+      weaknessByModule.set(key, entry);
+    });
+  });
+  const weaknessAreas = [...weaknessByModule.entries()]
+    .sort((a, b) => b[1].missed - a[1].missed)
+    .slice(0, 6)
+    .map(([key, entry]) => {
+      const enrollment = enrollments.find((e) => e.courseId === entry.courseId);
+      return {
+        courseId: entry.courseId,
+        courseTitle: enrollment?.course?.title || null,
+        moduleOrder: entry.moduleOrder,
+        moduleTitle: entry.moduleTitle,
+        missedQuestions: entry.missed,
+        topics: [...entry.topics]
+      };
+    });
 
   const enrolledCourseIds = enrollments.map((enrollment) => enrollment.courseId);
 
@@ -134,6 +186,10 @@ async function buildLearnerModel(studentId) {
       averageQuizPercentage,
       passedQuizzes: passedCount,
       quizPassRate: quizAttempts.length ? Math.round((passedCount / quizAttempts.length) * 100) : null,
+      assessmentAttempts: assessmentAttempts.length,
+      averageAssessmentPercentage,
+      passedAssessments: passedAssessmentCount,
+      assessmentPassRate: assessmentAttempts.length ? Math.round((passedAssessmentCount / assessmentAttempts.length) * 100) : null,
       gradedSubmissions: gradedSubmissions.length,
       averageAssignmentGrade
     },
@@ -145,7 +201,8 @@ async function buildLearnerModel(studentId) {
       activeDays,
       lastActiveAt: activityLogs.length ? activityLogs[0].performedAt : null
     },
-    difficultyAreas
+    difficultyAreas,
+    weaknessAreas
   };
 }
 

@@ -31,7 +31,6 @@ function StudentDashboard() {
   const navigate = useNavigate();
 
   const [timeLeft, setTimeLeft] = useState(ASSESSMENT_TIME_LIMIT);
-  const [redirectCountdown, setRedirectCountdown] = useState(null);
   const submitRef = useRef(null);
   submitRef.current = () => {
     const { assessmentId, answers } = wizard;
@@ -168,9 +167,9 @@ function StudentDashboard() {
       const data = await api.post('/assessment/submit', {
         assessmentId,
         answers,
+        timeSpent: ASSESSMENT_TIME_LIMIT - timeLeft,
       });
       await refreshEnrolledCourses();
-      setRedirectCountdown(3);
       setWizard((w) => ({ ...w, phase: 'result', result: data }));
     } catch (error) {
       setWizard((w) => ({ ...w, error: error.message || 'Failed to submit assessment' }));
@@ -185,9 +184,6 @@ function StudentDashboard() {
     closeWizard();
     if (courseId) navigate(moduleOrder ? `/courses/${courseId}?module=${moduleOrder}` : `/courses/${courseId}`);
   };
-
-  const autoRedirectRef = useRef(null);
-  autoRedirectRef.current = goToStudy;
 
   useEffect(() => {
     if (wizard.phase !== 'questions' || !wizard.assessmentId) return undefined;
@@ -207,19 +203,7 @@ function StudentDashboard() {
     }
   }, [timeLeft, wizard.phase]);
 
-  useEffect(() => {
-    if (wizard.phase !== 'result' || wizard.result?.recommendedModuleOrder == null) return undefined;
-    if (redirectCountdown === 0) {
-      autoRedirectRef.current();
-      return undefined;
-    }
-    if (redirectCountdown === null) return undefined;
-    const timer = setTimeout(() => setRedirectCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [wizard.phase, wizard.result, redirectCountdown]);
-
   const closeWizard = () => {
-    setRedirectCountdown(null);
     setWizard({ open: false, course: null, phase: 'intro', assessmentId: null, questions: [], answers: [], result: null, error: null });
   };
 
@@ -519,8 +503,9 @@ function StudentDashboard() {
                 <p className="text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid">Placement Assessment</p>
                 <h2 className="font-display mt-3 text-2xl font-semibold tracking-tight">{wizard.course?.title}</h2>
                 <p className="mt-3 text-sm text-muted">
-                  You will answer {wizard.course ? '10' : ''} questions generated for this course.
-                  Based on your answers, we will recommend a starting level and a module.  
+                  You will answer {wizard.course ? '10' : ''} questions generated for this course within a
+                  2-minute time limit. Based on your answers, we grade each question, point out your weak
+                  areas, and recommend the exact module to review.
                 </p>
                 <button
                   onClick={startAssessment}
@@ -607,34 +592,83 @@ function StudentDashboard() {
             )}
 
             {wizard.phase === 'result' && wizard.result && (
-              <div className="text-center">
-                <div
-                  className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border ${
-                    wizard.result.percentage >= 50
-                      ? 'border-orange-400/40 bg-orange-400/10'
-                      : 'border-amber-400/40 bg-amber-400/10'
-                  }`}
-                >
-                  <span className="font-display text-2xl font-semibold text-accent-soft">
-                    {wizard.result.percentage}%
-                  </span>
-                </div>
-                <p className="mt-6 text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid">Assessment Complete</p>
-                <h2 className="font-display mt-3 text-2xl font-semibold tracking-tight">
-                  Recommended Level: {wizard.result.level}
-                </h2>
-                <p className="mt-3 text-sm text-muted">
-                  You scored {wizard.result.score} out of {wizard.result.total}. Start with{' '}
-                  <span className="font-semibold text-secondary">
-                    {wizard.result.recommendedModule || wizard.result.nextLesson}
-                  </span>
-                  .
-                </p>
-                {wizard.result.recommendedModuleOrder != null && (
-                  <p className="mt-4 rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-3 text-sm font-medium text-accent-soft">
-                    Taking you to {wizard.result.recommendedModule} in {redirectCountdown ?? 0}s…
+              <div>
+                <div className="text-center">
+                  <div
+                    className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border ${
+                      wizard.result.percentage >= 50
+                        ? 'border-orange-400/40 bg-orange-400/10'
+                        : 'border-amber-400/40 bg-amber-400/10'
+                    }`}
+                  >
+                    <span className="font-display text-2xl font-semibold text-accent-soft">
+                      {wizard.result.percentage}%
+                    </span>
+                  </div>
+                  <p className="mt-6 text-sm font-semibold uppercase tracking-[0.25em] text-accent-mid">Assessment Complete</p>
+                  <h2 className="font-display mt-3 text-2xl font-semibold tracking-tight">
+                    Recommended Level: {wizard.result.level}
+                  </h2>
+                  <p className="mt-3 text-sm text-muted">
+                    You scored {wizard.result.score} out of {wizard.result.total}.
                   </p>
+                  {wizard.result.timeExpired && (
+                    <p className="mt-3 text-sm font-medium text-danger">Time&apos;s up — your answers were submitted automatically.</p>
+                  )}
+                </div>
+
+                {(wizard.result.moduleRecommendations || []).length > 0 && (
+                  <div className="mt-8 rounded-2xl border border-orange-400/30 bg-orange-400/10 p-5">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent-mid">Review these modules</p>
+                    <ul className="mt-3 space-y-2">
+                      {(wizard.result.moduleRecommendations || []).map((rec) => (
+                        <li key={rec.moduleOrder} className="text-sm text-secondary">
+                          <span className="font-semibold text-content">Module {rec.moduleOrder}: {rec.moduleTitle}</span>
+                          {rec.missed > 0 && <span className="text-muted"> — {rec.missed} missed</span>}
+                          {rec.topics.length > 0 && (
+                            <span className="mt-1 block text-xs text-muted">Topics: {rec.topics.join(', ')}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
+
+                <div className="mt-8">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent-mid">Question breakdown</p>
+                  <ul className="mt-3 space-y-3">
+                    {(wizard.result.results || []).map((r, index) => (
+                      <li key={index} className="rounded-xl border border-line bg-card-deep p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-medium text-content">
+                            {index + 1}. {r.question}
+                          </p>
+                          <span
+                            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+                              r.isCorrect
+                                ? 'bg-emerald-400/10 text-emerald-400'
+                                : 'bg-red-400/10 text-red-400'
+                            }`}
+                          >
+                            {r.isCorrect ? 'Correct' : 'Wrong'}
+                          </span>
+                        </div>
+                        <p className={`mt-2 text-sm ${r.isCorrect ? 'text-emerald-400/90' : 'text-danger'}`}>
+                          Your answer: {r.selectedAnswer == null ? 'Not answered' : r.selectedAnswer}
+                        </p>
+                        {!r.isCorrect && (
+                          <p className="mt-1 text-sm text-emerald-400/90">
+                            Correct answer: {r.correctAnswer}
+                          </p>
+                        )}
+                        {r.moduleTitle && (
+                          <p className="mt-2 text-xs text-muted">Module {r.moduleOrder}: {r.moduleTitle}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <button
                     onClick={() => startAssessment()}
@@ -651,7 +685,7 @@ function StudentDashboard() {
                 </div>
                 <button
                   onClick={closeWizard}
-                  className="mt-4 text-sm font-semibold text-muted transition hover:text-content"
+                  className="mt-4 w-full text-center text-sm font-semibold text-muted transition hover:text-content"
                 >
                   Not now
                 </button>

@@ -9,6 +9,7 @@ const Assignment = require('./Assignment');
 const Submission = require('./Submission');
 const Quiz = require('./Quiz');
 const QuizAttempt = require('./QuizAttempt');
+const AssessmentAttempt = require('./AssessmentAttempt');
 const Gradebook = require('./Gradebook');
 const Message = require('./Message');
 const Enrollment = require('./Enrollment');
@@ -107,6 +108,13 @@ Course.hasMany(ActivityLog, { foreignKey: 'courseId', as: 'activityLogs' });
 AssistantMessage.belongsTo(User, { foreignKey: 'studentId', as: 'student' });
 User.hasMany(AssistantMessage, { foreignKey: 'studentId', as: 'assistantMessages' });
 
+// AssessmentAttempt associations
+AssessmentAttempt.belongsTo(User, { foreignKey: 'studentId', as: 'student' });
+User.hasMany(AssessmentAttempt, { foreignKey: 'studentId', as: 'assessmentAttempts' });
+
+AssessmentAttempt.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
+Course.hasMany(AssessmentAttempt, { foreignKey: 'courseId', as: 'assessmentAttempts' });
+
 module.exports = {
   User,
   Course,
@@ -119,6 +127,7 @@ module.exports = {
   Submission,
   Quiz,
   QuizAttempt,
+  AssessmentAttempt,
   Gradebook,
   Message,
   Enrollment,

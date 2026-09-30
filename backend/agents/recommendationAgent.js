@@ -53,4 +53,44 @@ function recommend(score, modules) {
   };
 }
 
-module.exports = { recommend };
+/**
+ * Rank course modules by how many questions the student missed in each,
+ * producing the specific module(s) to review. Modules with more misses come
+ * first (ties broken by module order). On a perfect score the fallback is the
+ * level-based module pick (Advanced -> most advanced module).
+ */
+function recommendModules(weaknesses, modules, level) {
+  const list = Array.isArray(modules) ? modules.filter(Boolean) : [];
+  const byOrder = new Map();
+
+  for (const w of weaknesses) {
+    if (w.moduleOrder == null) continue;
+    const entry = byOrder.get(w.moduleOrder) || { moduleOrder: w.moduleOrder, missed: 0, topics: [] };
+    entry.missed += 1;
+    if (w.topic && !entry.topics.includes(w.topic)) entry.topics.push(w.topic);
+    byOrder.set(w.moduleOrder, entry);
+  }
+
+  let ranked = [...byOrder.values()].sort((a, b) => b.missed - a.missed || a.moduleOrder - b.moduleOrder);
+
+  if (ranked.length === 0) {
+    const titles = list.map((m) => m.title);
+    const levelPick = pickModule(titles, level);
+    const module = list.find((m) => m.order === levelPick.recommendedModuleOrder);
+    if (module) {
+      ranked = [{ moduleOrder: module.order, missed: 0, topics: [] }];
+    }
+  }
+
+  return ranked.slice(0, 3).map((entry) => {
+    const module = list.find((m) => m.order === entry.moduleOrder);
+    return {
+      moduleOrder: entry.moduleOrder,
+      moduleTitle: module ? module.title : (entry.moduleTitle || 'Course module'),
+      missed: entry.missed,
+      topics: entry.topics
+    };
+  });
+}
+
+module.exports = { recommend, recommendModules };

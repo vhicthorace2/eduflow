@@ -757,6 +757,46 @@ When you start, finish, or reprioritize work, update this file.
 - **Follow-up:** set `GROQ_API_KEY` in `backend/.env` (free at console.groq.com) to activate real LLM generations —
   currently all agents run their offline/bank fallbacks (401 at Groq caught).
 
+### 2026-09-30 — Assessment agent: timed quiz with per-question feedback + performance routing to the Learner Agent
+- **Status:** completed
+- **Summary:** The placement assessment is now a timed quiz (120-second server-enforced limit) that grades on
+  completion OR time expiry, shows a per-question breakdown (question / your answer / correct|wrong / correct answer
+  for misses), flags weak modules from failed questions, recommends the exact module(s) to review, and persists a
+  structured report (`AssessmentAttempt`) that the Learner Agent aggregates into `weaknessAreas` + assessment
+  performance surfaced via `GET /api/learner/insights`.
+- **Details:**
+  - Backend `agents/assessmentAgent.js`: per-bank `bankTopics` + `genericTopics`; new
+    `generateStudentTest(courseTitle, modules)` tagged each of the 10 questions with a topic and the best-matching
+    course module (`mapQuestionsToModules` token-overlap matching, balanced fallback so every module is covered).
+  - `agents/evaluationAgent.js`: `evaluateDetailed` → `{ score, total, percentage, results[], weaknesses[] }`.
+  - `agents/recommendationAgent.js`: `recommendModules` ranks modules by missed-question count (top 3), level-based
+    `pickModule` fallback on perfect scores.
+  - New `models/AssessmentAttempt.js` (registered in `models/index.js`): answers/results/weaknesses/
+    moduleRecommendations/score/total/percentage/passed/level/timeSpent/completedAt.
+  - `controllers/assessmentController.js`: `start` resolves course + modules, returns `timeLimit:120` +
+    module-tagged sanitized questions; `submit` computes the breakdown, enforces used-seconds from client, persists
+    the attempt, and returns results/weakAreas/moduleRecommendations/recommendedModule(+Order)/attemptId/timeExpired.
+  - `controllers/courseController.js` `enrollCourse` gate now stores modules + `startedAt` + `timeLimit` in the active
+    assessment so the legacy entry point grades identically.
+  - `agents/learnerModellingAgent.js`: reads `AssessmentAttempt`; adds `performance.assessmentAttempts/
+    averageAssessmentPercentage/assessmentPassRate` and `weaknessAreas` (module-level missed counts + topics across
+    attempts); learner model also folds assessment % into per-course difficulty/completed logic. New
+    `GET /api/learner/insights` (auth + isStudent) in `controllers/learnerController.js` / `routes/learner.js`.
+  - Frontend `screens/studentDashboard.jsx`: submit sends `timeSpent`; result phase renders the per-question
+    breakdown, a "Review these modules" panel (missed counts + topics), and a "Time's up" note; removed the 3s
+    auto-redirect so students can read the feedback ("Start studying →" still jumps to the recommended module).
+- **Verified:** backend E2E on port 5000 (boot + register + `/assessment/start` + submit with 3 deliberately
+  unanswered + `timeSpent:120`): 10/10 module-tagged, timeLimit 120, breakdown flagged 3 unanswered as wrong,
+  8 weakAreas, module recommendations ranked by misses (2/2/2/2), `attemptId` persisted, `timeExpired:true`, learner
+  model `weaknessAreas` matched module titles + topics, `/api/learner/insights` returned the report, test user + rows
+  cleaned. Frontend `npm run lint` clean + `npm run build` green (405 modules). Scratch script deleted.
+- **Files:** backend `agents/assessmentAgent.js`, `agents/evaluationAgent.js`, `agents/recommendationAgent.js`,
+  `agents/learnerModellingAgent.js`, `models/AssessmentAttempt.js` (new), `models/index.js`,
+  `controllers/assessmentController.js`, `controllers/courseController.js`, `controllers/learnerController.js`,
+  `routes/learner.js`; frontend `screens/studentDashboard.jsx`.
+- **Follow-up:** set `GROQ_API_KEY` so `pickQuestions` generates fresh per-run questions (currently deterministic
+  course banks).
+
 ### 2026-08-08 — Learning flow: seeded courses + modules, two-phase assessment wizard
 - **Status:** completed
 - **Summary:** Seeded 5 courses / 20 modules; reworked assessment into a secure

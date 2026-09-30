@@ -1,12 +1,15 @@
 const crypto = require('crypto');
-const { generateAssessment } = require('../agents/assessmentAgent.js');
-const { evaluateAnswers } = require('../agents/evaluationAgent.js');
-const { recommend } = require('../agents/recommendationAgent.js');
-const { Course, Module, Enrollment } = require('../models');
+const { generateStudentTest } = require('../agents/assessmentAgent.js');
+const { evaluateAnswers, evaluateDetailed } = require('../agents/evaluationAgent.js');
+const { recommend, recommendModules } = require('../agents/recommendationAgent.js');
+const { Course, Module, Enrollment, AssessmentAttempt } = require('../models');
 const { activeAssessments, sanitizeQuestions } = require('../agents/assessmentStore.js');
 
+const ASSESSMENT_TIME_LIMIT = 120; // seconds (2-minute quiz window)
+const PASS_THRESHOLD = 50;
+
 /**
- * Generate assessment questions for a course and keep the answers server-side
+ * Generate a timed assessment for a course and keep the answers server-side
  * @route POST /api/assessment/start
  */
 exports.startAssessment = async (req, res, next) => {
@@ -17,21 +20,41 @@ exports.startAssessment = async (req, res, next) => {
       return res.status(400).json({ message: 'Course topic is required' });
     }
 
-    const questions = await generateAssessment(course);
+    let courseRow = null;
+    let modules = [];
+    try {
+      courseRow = courseId ? await Course.findByPk(courseId) : await Course.findOne({ where: { title: course } });
+      if (courseRow) {
+        modules = await Module.findAll({
+          where: { courseId: courseRow.id, isActive: true },
+          order: [['order', 'ASC']]
+        });
+      }
+    } catch (error) {
+      courseRow = null;
+      modules = [];
+    }
+
+    const test = await generateStudentTest(courseRow ? courseRow.title : course, modules);
 
     const assessmentId = crypto.randomUUID();
     activeAssessments.set(assessmentId, {
-      course,
-      courseId: courseId || null,
-      questions,
-      correctAnswers: questions.map((q) => q.correctAnswer)
+      course: courseRow ? courseRow.title : course,
+      courseId: courseRow ? courseRow.id : (courseId || null),
+      modules: test.modules,
+      questions: test.questions,
+      correctAnswers: test.correctAnswers,
+      startedAt: Date.now(),
+      timeLimit: ASSESSMENT_TIME_LIMIT
     });
 
     res.status(200).json({
       success: true,
       assessmentId,
-      course,
-      questions: sanitizeQuestions(questions)
+      course: courseRow ? courseRow.title : course,
+      timeLimit: ASSESSMENT_TIME_LIMIT,
+      moduleCount: test.modules.length,
+      questions: sanitizeQuestions(test.questions)
     });
   } catch (error) {
     next(error);
@@ -39,12 +62,14 @@ exports.startAssessment = async (req, res, next) => {
 };
 
 /**
- * Evaluate student answers and recommend a level based on performance
+ * Grade a timed assessment at completion or time expiry, give per-question
+ * feedback, derive weak areas + module recommendations, and route the
+ * structured report to the learner agent via an AssessmentAttempt record.
  * @route POST /api/assessment/submit
  */
 exports.submitAssessment = async (req, res, next) => {
   try {
-    const { assessmentId, answers } = req.body;
+    const { assessmentId, answers, timeSpent } = req.body;
 
     const assessment = activeAssessments.get(assessmentId);
     if (!assessment) {
@@ -55,40 +80,56 @@ exports.submitAssessment = async (req, res, next) => {
       return res.status(400).json({ message: 'answers array is required' });
     }
 
-    const score = evaluateAnswers(answers, assessment.correctAnswers);
-    const total = assessment.correctAnswers.length;
-    const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+    const { score, total, percentage, results, weaknesses } = evaluateDetailed(answers, assessment.questions);
 
-    let modules = [];
+    const moduleTitles = assessment.modules.map((m) => m.title);
+    const levelInfo = recommend(percentage, moduleTitles);
+    const moduleRecommendations = recommendModules(weaknesses, assessment.modules, levelInfo.level);
+    const primary = moduleRecommendations[0];
+
+    const elapsed = Math.max(0, Math.round((Date.now() - (assessment.startedAt || Date.now())) / 1000));
+    const usedSeconds = Number.isInteger(timeSpent) ? Math.min(timeSpent, assessment.timeLimit) : elapsed;
+
+    let course = null;
     let enrolled = false;
+    let attempt = null;
     try {
-      const course = assessment.courseId
+      course = assessment.courseId
         ? await Course.findByPk(assessment.courseId)
         : await Course.findOne({ where: { title: assessment.course } });
-      if (course) {
-        const courseModules = await Module.findAll({
-          where: { courseId: course.id, isActive: true },
-          order: [['order', 'ASC']]
+      if (course && req.user && req.user.id) {
+        const [, created] = await Enrollment.findOrCreate({
+          where: { courseId: course.id, studentId: req.user.id },
+          defaults: { status: 'active', enrolledAt: new Date() }
         });
-        modules = courseModules.map((m) => m.title);
+        enrolled = true;
+        if (created) {
+          console.log(`Enrolled student ${req.user.id} in course ${course.id}`);
+        }
 
-        if (req.user && req.user.id) {
-          const [, created] = await Enrollment.findOrCreate({
-            where: { courseId: course.id, studentId: req.user.id },
-            defaults: { status: 'active', enrolledAt: new Date() }
+        try {
+          attempt = await AssessmentAttempt.create({
+            studentId: req.user.id,
+            courseId: course.id,
+            answers,
+            results,
+            weaknesses,
+            moduleRecommendations,
+            score,
+            total,
+            percentage,
+            passed: percentage >= PASS_THRESHOLD,
+            level: levelInfo.level,
+            timeSpent: usedSeconds
           });
-          enrolled = true;
-          if (created) {
-            console.log(`Enrolled student ${req.user.id} in course ${course.id}`);
-          }
+        } catch (error) {
+          attempt = null;
         }
       }
     } catch (error) {
-      modules = [];
+      course = null;
       enrolled = false;
     }
-
-    const recommendation = recommend(percentage, modules);
 
     activeAssessments.delete(assessmentId);
 
@@ -97,8 +138,18 @@ exports.submitAssessment = async (req, res, next) => {
       score,
       total,
       percentage,
+      passed: percentage >= PASS_THRESHOLD,
       enrolled,
-      ...recommendation
+      timeSpent: usedSeconds,
+      timeExpired: usedSeconds >= assessment.timeLimit,
+      level: levelInfo.level,
+      results,
+      weakAreas: weaknesses,
+      moduleRecommendations,
+      recommendedModule: primary ? primary.moduleTitle : levelInfo.recommendedModule,
+      recommendedModuleOrder: primary ? primary.moduleOrder : (levelInfo.recommendedModuleOrder ?? null),
+      recommendedModules: moduleRecommendations.map((r) => ({ order: r.moduleOrder, title: r.moduleTitle })),
+      attemptId: attempt ? attempt.id : null
     });
   } catch (error) {
     next(error);

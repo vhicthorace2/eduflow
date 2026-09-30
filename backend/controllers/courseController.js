@@ -201,14 +201,22 @@ exports.enrollCourse = async (req, res, next) => {
       });
     }
 
-    const test = await generateStudentTest(course.title);
+    const modules = await Module.findAll({
+      where: { courseId: course.id, isActive: true },
+      order: [['order', 'ASC']]
+    });
+
+    const test = await generateStudentTest(course.title, modules);
 
     const assessmentId = crypto.randomUUID();
     activeAssessments.set(assessmentId, {
       course: course.title,
       courseId: course.id,
+      modules: test.modules,
       questions: test.questions,
-      correctAnswers: test.correctAnswers
+      correctAnswers: test.correctAnswers,
+      startedAt: Date.now(),
+      timeLimit: 120
     });
 
     res.status(200).json({
@@ -217,6 +225,7 @@ exports.enrollCourse = async (req, res, next) => {
       message: 'Answer the 10-question assessment to complete your enrollment',
       assessmentId,
       course: course.title,
+      timeLimit: 120,
       questions: sanitizeQuestions(test.questions)
     });
   } catch (error) {

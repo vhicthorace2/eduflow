@@ -63,3 +63,27 @@ exports.getRecommendations = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Return the structured performance report routed to the learner agent after
+ * each timed assessment: weak modules, review topics, and aggregate pass rate.
+ * @route GET /api/learner/insights
+ */
+exports.getAssessmentInsights = async (req, res, next) => {
+  try {
+    const model = await buildLearnerModel(req.user.id);
+    res.status(200).json({
+      success: true,
+      report: {
+        weaknessAreas: model.weaknessAreas,
+        performance: {
+          assessmentAttempts: model.performance.assessmentAttempts,
+          averageAssessmentPercentage: model.performance.averageAssessmentPercentage,
+          assessmentPassRate: model.performance.assessmentPassRate
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

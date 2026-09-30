@@ -867,3 +867,49 @@ Format per entry:
 - **Verification:** `git diff` confirmed only intended lines changed; end-of-file now has exactly one `</>` `)}` `</main>`;
   `npm run lint` clean; `npm run build` succeeds.
 - **Files involved:** frontend `src/screens/coursesDetails.jsx`.
+
+### 2026-09-30 — Assessment agent: timed 10-question quiz, per-question feedback, weekly-area routing to the learner agent (backend / agents)
+- **What happened:** The placement assessment only returned a score, a level, and one generic module. Requirement: a
+  timed quiz with a 2-minute countdown that, on completion OR time expiry, shows a per-question breakdown (question,
+  student answer, correct/wrong, correct answer for misses), identifies skill-gap modules from failed questions, and
+  routes a structured report to the Learner Agent so it can recommend the exact module(s) to review.
+- **Fix / prevention:**
+  - `assessmentAgent.js`: every bank question is now topic-tagged (`bankTopics`, aligned by index, plus `genericTopics`).
+    New `generateStudentTest(courseTitle, modules)` tags questions via `mapQuestionsToModules` — `topicMatchScore`
+    (token-overlap vs module titles) assigns each question to a course module; unmatched questions are balanced
+    round-robin-to-least-loaded so all modules are covered. The LLM path in `pickQuestions` falls back to the same
+    tagging.
+  - `evaluationAgent.js`: new `evaluateDetailed(studentAnswers, questions)` → `{ score, total, percentage, results,
+    weaknesses }`, each result carrying question/options/topic/moduleOrder/moduleTitle/selectedAnswer/correctAnswer/isCorrect.
+  - `recommendationAgent.js`: new `recommendModules(weaknesses, modules, level)` ranks modules by missed-questions
+    (desc), top 3, with the level-based `pickModule` fallback on a perfect score.
+  - New `models/AssessmentAttempt.js` (studentId, courseId, answers, results, weaknesses, moduleRecommendations, score,
+    total, percentage, passed, level, timeSpent, completedAt) registered in `models/index.js`. `submitAssessment`
+    persists it server-side; that record IS the structured report.
+  - `learnerModellingAgent.js`: queries `AssessmentAttempt`; adds `performance.assessmentAttempts/averageAssessmentPercentage/
+    assessmentPassRate` and a `weaknessAreas` array (module-title + topic-level misses across attempts). New
+    `GET /api/learner/insights` surfaces the report.
+  - `courseController.enrollCourse` now fetches the course modules and stores `startedAt`/`timeLimit` (120) in the
+    active assessment so either entry point grades the same way.
+  - Frontend `studentDashboard.jsx`: `submitAssessment` sends `timeSpent = ASSESSMENT_TIME_LIMIT - timeLeft`; result
+    phase renders the per-question breakdown (selected vs correct), review-modules panel (missed counts + topics), and a
+    "Time's up" note when expired. Removed the 3s auto-redirect so the feedback can actually be read (auto-jump defeated
+    the point of showing a breakdown).
+- **Gotchas:**
+  - Don't reuse `QuizAttempt` — its `quizId` is `NOT NULL`; a dedicated `AssessmentAttempt` (new table, created by
+    plain `sync()` on boot) is required.
+  - A scratch E2E script that called the DB for cleanup must `require('dotenv').config()` first — `config/database.js`
+    reads env at module load; without dotenv the Sequelize driver gets an undefined connection string ("url argument
+    must be a string"). `server.js` does this at line 1; standalone scripts must too.
+  - Keep `correctAnswer` stripped from `/start` (client sees options only) — the breakdown carries `correctAnswer` ONLY
+    in the post-submit response, which is the intended feedback surface.
+- **Verification:** backend E2E (boot + register + `/assessment/start` + submit with 3 deliberately-unanswered
+  questions + `timeSpent:120`) → 10/10 module-tagged questions, `timeLimit:120`, breakdown raised the 3 unanswered as
+  wrong, weakAreas 8, module recommendations ranked 2/2/2/2 by missed desc, `attemptId` persisted, `timeExpired:true`,
+  learner model showed `weaknessAreas` with the matched module titles + topics, `GET /api/learner/insights` returned the
+  same report, cleanup deleted the test user + rows. Frontend `npm run lint` + `npm run build` green (405 modules).
+  Scratch script deleted.
+- **Files involved:** backend `agents/assessmentAgent.js`, `agents/evaluationAgent.js`, `agents/recommendationAgent.js`,
+  `agents/learnerModellingAgent.js`, `models/AssessmentAttempt.js` (new), `models/index.js`,
+  `controllers/assessmentController.js`, `controllers/courseController.js`, `controllers/learnerController.js`,
+  `routes/learner.js`, frontend `screens/studentDashboard.jsx`.
