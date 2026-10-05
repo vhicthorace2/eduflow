@@ -1,7 +1,12 @@
 const OpenAI = require('openai');
 
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
-const provider = (process.env.AI_PROVIDER || 'groq').toLowerCase();
+
+// The provider has to follow the key that is actually present. Defaulting to 'groq'
+// regardless meant a lone OPENAI_API_KEY was still sent to Groq's endpoint, which
+// rejected it with a 401 that the callers' bare catch turned into the offline message.
+const inferredProvider = process.env.GROQ_API_KEY ? 'groq' : 'openai';
+const provider = (process.env.AI_PROVIDER || inferredProvider).trim().toLowerCase();
 const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
 
 let baseURL;

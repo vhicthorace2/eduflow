@@ -988,6 +988,43 @@ When you start, finish, or reprioritize work, update this file.
 - **Files:** `package.json` (root), `package-lock.json` (root),
   `.agents/LESSONS.md`, `.agents/TASKS.md`
 
+### 2026-10-05 — Fix AI assistant stuck in "offline mode" (provider inferred from the wrong env var)
+- **Status:** completed
+- **Summary:** The in-app assistant answered every question with the canned "I'm currently in offline
+  mode" message. `services/openaiservices.js` defaulted the provider to `groq` *independently of which
+  key existed*, so the `OPENAI_API_KEY` in `.env` was posted to `api.groq.com` and 401'd — and both AI
+  callers swallowed the error in a bare `catch`, so a config bug looked exactly like an outage.
+- **Details:**
+  - `backend/services/openaiservices.js`: provider is now inferred from the key actually present
+    (`process.env.GROQ_API_KEY ? 'groq' : 'openai'`), with an explicit `AI_PROVIDER` still taking
+    precedence. Key precedence (`GROQ_API_KEY || OPENAI_API_KEY`) unchanged; `baseURL` stays undefined
+    for OpenAI so the SDK uses `https://api.openai.com/v1`.
+  - `backend/agents/assistantAgent.js` and `backend/agents/assessmentAgent.js`: the bare `catch` now
+    logs `error.status` + `error.message` so provider misconfiguration is visible in the server log
+    instead of silently degrading to the offline reply / course bank.
+  - `backend/.env` (gitignored, not committed): added `GROQ_API_KEY` and `AI_MODEL`. The account has
+    **no** `llama-3.3-70b-versatile` — Groq returns `404 model does not exist or you do not have
+    access` — so `AI_MODEL=openai/gpt-oss-120b` is pinned. `/v1/models` for this key returns only 11
+    models; `gpt-oss-120b` is the strongest general chat model among them.
+- **Verified:**
+  - Resolved config: `baseURL=https://api.groq.com/openai/v1`, `defaultModel()=openai/gpt-oss-120b`,
+    `client` non-null.
+  - Provider/credential matrix over 8 env combinations (OpenAI key only, Groq key only, both, both
+    overrides, `AI_BASE_URL`, `AI_MODEL`, no keys) — every combination resolves to the intended
+    endpoint and model.
+  - **Live assistant call returns a real answer** ("A foreign key is a column (or set of columns) in
+    one table that references the primary key of another table...— Ifeanyi"), no offline fallback.
+  - The earlier OpenAI attempt surfaced the real account blocker:
+    `429 You have no credits remaining` — the reason Groq was adopted on 2026-09-28.
+  - `node --check` clean on all three edited files; both agent modules load and export unchanged.
+- **Known limits on this key (documented in `.env` comments):**
+  - **Photo answers cannot work.** None of the 11 available models accept images — Groq rejects the
+    OpenAI content-array format with `400 messages[1].content must be a string`. Ifeanyi's photo
+    feature stays on the offline reply for this key.
+- **Files:** `backend/services/openaiservices.js`, `backend/agents/assistantAgent.js`,
+  `backend/agents/assessmentAgent.js`, `backend/.env` (gitignored),
+  `.agents/LESSONS.md`, `.agents/TASKS.md`
+
 ---
 
 ## Backlog
@@ -999,9 +1036,31 @@ When you start, finish, or reprioritize work, update this file.
   `/:courseId/learning-path` so `getLearningPath` receives the param it reads;
   move `GET /my-submissions` (`routes/assignments.js:24`) above `GET /:id`
   (`:20`).
-- **Fix (config):** set `AI_PROVIDER=openai` in `backend/.env` so the existing
+- ~~**Fix (config):** set `AI_PROVIDER=openai` in `backend/.env` so the existing
   `OPENAI_API_KEY`/`OPENAI_MODEL=gpt-5.5` pair is actually used instead of
-  being sent to Groq and silently falling back.
+  being sent to Groq and silently falling back.~~ **Done 2026-10-05:**
+  `services/openaiservices.js` now infers the provider from whichever key is
+  present, so no `AI_PROVIDER` is needed. Groq is now live via `GROQ_API_KEY` +
+  `AI_MODEL=openai/gpt-oss-120b`. OpenAI remains unusable until the account is
+  funded (`429 no credits remaining`).
+- **Fix (assessment LLM is dead on arrival):** `pickQuestions` in
+  `backend/agents/assessmentAgent.js` sends the model *"Generate 10 beginner
+  multiple choice questions … in JSON format"*, but `normalizeQuestions` only
+  accepts objects with a **`correctAnswer`** field and the model returns
+  **`answer`**. Every generated question is therefore filtered out, `normalizeQuestions`
+  returns `[]`, and the handler pads from `courseBanks` — so the "LLM-generated"
+  assessment has always been the static bank. Also accepts only a bare JSON array,
+  so a `{"questions": [...]}` envelope is dropped. Fix: accept `answer` as an alias,
+  unwrap a `questions` envelope, and log when the LLM yield is 0 instead of
+  silently padding. Verified by calling `generateStudentTest` with a course title
+  that has no bank entry ("Zebrafish Husbandry and Aquaponic Hydrodynamics") — it
+  still returned the generic bank questions, proving the fallback.
+- **Limitation (Groq free tier, this key):** none of the 11 models the account can
+  reach accept image input, and Groq rejects the OpenAI content-array format with
+  `400 messages[1].content must be a string`. Ifeanyi's photo/screenshot feature
+  cannot work on this key; text chat is fine. Needs a vision-capable model
+  (`llama-3.2-11b-vision-preview` was in `.env.example` but is not available to this
+  account) or a second provider for image turns.
 - **Fix (RBAC):** `routes/courses.js:20` should use `isInstructorOrAdmin`, not
   `isInstructor`, or lecturers permanently see an empty course list on the
   consistency screen.

@@ -269,7 +269,9 @@ async function pickQuestions(course) {
         };
       }
     } catch (error) {
-      // fall through to the course bank below
+      // Log the real cause so a provider misconfiguration is distinguishable from
+      // the deterministic course bank being used as designed.
+      console.error('[assessment] AI request failed:', error.status || '', error.message || error);
     }
   }
 

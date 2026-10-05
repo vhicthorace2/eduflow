@@ -1161,3 +1161,45 @@ Format per entry:
      Windows-only `npm install` as evidence that the manifest is sound.
 - **Files involved:** `package.json` (root), `package-lock.json` (root), `backend/package.json`,
   `frontend/package.json`.
+
+### 2026-10-05 — A bare `catch` around the AI call turned a provider misconfiguration into "offline mode" (ai / diagnostics)
+- **What happened:** The in-app assistant replied *"I understand you're asking about something, but I'm
+  currently in offline mode and can't reach the AI service..."* for every question. The same message
+  appeared for image uploads (a different string, `assistantAgent.js:25`). No log line, no status code,
+  nothing — the assistant looked like a working feature that was merely down.
+- **Root cause (two layers, and only the first was guessable from code):**
+  1. `services/openaiservices.js:4` did `const provider = (process.env.AI_PROVIDER || 'groq')`. The
+     provider was decided **independently of which key was present**, so a `.env` holding only
+     `OPENAI_API_KEY` still got `provider === 'groq'` and therefore `baseURL = GROQ_BASE_URL`
+     (`:10-12`) — an OpenAI key posted to `api.groq.com`, which rejects it with a 401. `.env` has
+     `OPENAI_API_KEY` set and **no** `GROQ_API_KEY`, so every call 401'd.
+  2. `assistantAgent.js:86` and `assessmentAgent.js:271` both had a **bare `catch` with only a
+     comment** — no logging. The 401 was swallowed and execution fell through to `fallbackReply` /
+     the deterministic course bank. So a credential/endpoint bug and a genuine network outage
+     produced byte-identical user-facing output.
+  Fixing only layer 1 would have left the app *still* silent: with the endpoint corrected, the real
+  error surfaced as `429 You have no credits remaining` (the OpenAI account had been exhausted,
+  which is exactly why Groq was adopted on 2026-09-28). Only logging the error revealed that.
+- **Fix:**
+  - `openaiservices.js`: infer the provider from the key that is actually present
+    (`const inferredProvider = process.env.GROQ_API_KEY ? 'groq' : 'openai'`) and let an explicit
+    `AI_PROVIDER` still win. Original key precedence (`GROQ_API_KEY || OPENAI_API_KEY`) is unchanged,
+    and `baseURL` is left undefined for OpenAI so the SDK uses its own default.
+  - Both agents now log the real cause: `console.error('[assistant] AI request failed:', error.status || '', error.message || error)`.
+    Status + message only, never the key or the request body.
+- **Prevention:**
+  1. **Never let a provider/base-URL default disagree with the credential it is paired with.** When
+     two env keys select two different endpoints, the endpoint must be derived from the key that was
+     actually found; an independent default is a silent-failure generator.
+  2. **A bare `catch` that falls back to canned text is a logging defect, not just a design choice.**
+     A fallback is fine; a *silent* fallback is not. Any branch that can degrade gracefully must
+     record why it degraded.
+  3. When a swallowed error is suspected, **add the logging first and re-run** — that is the only way
+     to learn the real status code. Guessing the cause from static reading gets you the reachable
+     bug (the wrong endpoint) and hides the one that actually blocks the user (no credits).
+  4. Prove provider/credential resolution as a **matrix**, not a single case. Spawning the module
+     under 8 env combinations (key present/absent × provider override × base-URL override × model
+     override) exposed every precedence rule at once, including that `AI_MODEL` and `AI_BASE_URL`
+     correctly outrank the inferred provider.
+- **Files involved:** `backend/services/openaiservices.js`, `backend/agents/assistantAgent.js`,
+  `backend/agents/assessmentAgent.js`, `backend/.env`.

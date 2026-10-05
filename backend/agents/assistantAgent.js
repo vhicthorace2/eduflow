@@ -84,7 +84,9 @@ async function generateReply({ content, imagePath, history }) {
       const answer = (response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content || '').trim();
       if (answer) return answer;
     } catch (error) {
-      // fall through to the offline responder below
+      // Log the real cause (bad key, wrong base URL, unknown model) so a provider
+      // misconfiguration is distinguishable from a genuine outage.
+      console.error('[assistant] AI request failed:', error.status || '', error.message || error);
     }
   }
 
