@@ -1119,3 +1119,45 @@ Format per entry:
 - **Files involved:** `backend/agents/contentResourceAgent.js`, `backend/controllers/forumController.js`,
   `backend/controllers/courseController.js`, `backend/controllers/gradebookController.js`,
   `backend/agents/learnerModellingAgent.js`, `docs/data-flow.md`.
+
+## Build / dependencies
+
+### 2026-10-05 — Root manifest duplicated the whole workspace tree, making a Windows-only native binary a *required* dep and breaking Linux deploys with EBADPLATFORM (build / deps)
+- **What happened:** Render (Linux, Node 24.14.1) failed `npm install` at the repo root with
+  `EBADPLATFORM: Unsupported platform for lightningcss-win32-x64-msvc@1.32.0: wanted {"os":"win32","cpu":"x64"}
+  (current: {"os":"linux","cpu":"x64"})`. Local `npm install` on Windows always succeeded, so the
+  bug was invisible until a Linux CI/CD run.
+- **Root cause:** the root `package.json` (npm workspaces root) carried a `dependencies` block with
+  **393 packages** — the entire hoisted dependency tree of *both* workspaces duplicated as **direct
+  root dependencies**. Two entries gave it away:
+  `"lightningcss-win32-x64-msvc": "^1.32.0"` (line 231, a Windows-only native binary) and
+  `"education-platform-backend": "^1.0.0"` + `"eduflow": "^0.0.0"` (lines 94-95), i.e. the manifest
+  listed the workspaces themselves as dependencies of the root. It was generated from a resolved
+  workspace tree, not hand-authored.
+  The mechanism: npm treats **optionalDependencies** as skippable when `os`/`cpu` don't match, but a
+  **direct** dependency as mandatory. Because `lightningcss-win32-x64-msvc` was direct, its lockfile
+  entry lost `"optional": true` and became `os: ["win32"], optional: undefined` — so on Linux npm
+  had no legal way to skip it and threw. Every other platform-specific package in the lock
+  (`@tailwindcss/oxide-*`, `@rolldown/binding-*`, `@libsql/*`, `fsevents`, the other
+  `lightningcss-*`) was correctly `optional: true` and therefore harmless. `libsql` was the other
+  non-optional entry but was multi-platform, so it did not fail.
+- **Fix:** deleted the whole root `dependencies` block (kept `workspaces`, `scripts`, metadata and
+  root-only `devDependencies`: `jest` + `supertest`). Both workspaces already declare their own
+  dependencies correctly (`backend/package.json` 16 deps, `frontend/package.json` 5 deps + 8 devDeps),
+  so nothing was lost. Regenerated `package-lock.json` with `npm install --package-lock-only`:
+  635 -> 612 entries, and **every** entry carrying `os`/`cpu` is now `optional: true`. Then a real
+  `npm install` ("removed 15 packages") and `npm run build` green.
+- **Prevention:**
+  1. With npm workspaces the root manifest declares only `workspaces`, `scripts`, metadata and
+     root-only deps. Anything else in the root `dependencies` is suspect — especially a package name
+     that matches a workspace name, which is proof the manifest was machine-generated from the tree.
+  2. After **any** dependency change, assert the lockfile has no mandatory platform-specific package:
+     `node -e "for(const [k,v] of Object.entries(require('./package-lock.json').packages)) if((v.os||v.cpu)&&!v.optional) console.log(k)"`
+     — expected output is empty. Run it before every deploy.
+  3. A lockfile regenerated on Windows is not automatically valid for a Linux deploy target. Native
+     packages (`lightningcss`, `@tailwindcss/oxide`, `@rolldown/binding-*`, `esbuild`, `@swc/*`) are
+     exactly where cross-platform lockfiles break.
+  4. Verify deploys on a Linux runner or a `node:24` Docker container once, rather than trusting a
+     Windows-only `npm install` as evidence that the manifest is sound.
+- **Files involved:** `package.json` (root), `package-lock.json` (root), `backend/package.json`,
+  `frontend/package.json`.

@@ -956,6 +956,38 @@ When you start, finish, or reprioritize work, update this file.
 - **Files:** `docs/database-schema.md`, `docs/data-flow.md`,
   `.agents/LESSONS.md`, `.agents/TASKS.md`
 
+### 2026-10-05 — Fix Render `npm install` EBADPLATFORM (Windows-only native binary as a root dependency)
+- **Status:** completed (code change; needs commit + push to take effect on Render)
+- **Summary:** Render's Linux build failed at `npm install` with
+  `EBADPLATFORM: Unsupported platform for lightningcss-win32-x64-msvc@1.32.0`. The root
+  `package.json` declared 393 packages — the whole hoisted tree of both workspaces — as
+  direct root dependencies, including a Windows-only native binary and self-references to
+  the workspaces themselves. A direct dependency is mandatory, so npm could not skip it on
+  Linux.
+- **Details:**
+  - Root cause: `"lightningcss-win32-x64-msvc": "^1.32.0"` at `package.json:231`, plus
+    `"education-platform-backend": "^1.0.0"` / `"eduflow": "^0.0.0"` at `:94-95`. Its
+    lockfile entry was `os: ["win32"], optional: undefined`; every other platform-specific
+    package was correctly `optional: true` and harmless.
+  - Fix: removed the root `dependencies` block, keeping `workspaces`, `scripts`, metadata and
+    root-only `devDependencies` (`jest`, `supertest`). Nothing was lost — `backend/package.json`
+    declares its own 16 deps and `frontend/package.json` its own 5 + 8 devDeps.
+  - Regenerated the lockfile (`npm install --package-lock-only`): 635 -> 612 entries, and every
+    entry with an `os`/`cpu` constraint is now `optional: true`.
+- **Verified:**
+  - `npm install` real run green ("removed 15 packages").
+  - `npm run build` green (frontend, `dist/assets/index-CqjKYwKb.js` 477 kB).
+  - All 196 local `require()`s under `backend/` resolve; `require('./backend/server.js')` loads
+    the full module graph and only fails at `connectDB` with `ECONNREFUSED` to the placeholder
+    `DATABASE_URL` — i.e. no missing dependency.
+  - Lockfile assertion: zero non-optional `os`/`cpu` entries.
+- **Follow-up:** this only reaches Render once committed and pushed. Re-run the Render deploy
+  after the push. Note that Render's build command is currently `npm install` with no
+  `npm run build` and no start command configured — the next failure will be about the start
+  command, not the install.
+- **Files:** `package.json` (root), `package-lock.json` (root),
+  `.agents/LESSONS.md`, `.agents/TASKS.md`
+
 ---
 
 ## Backlog
