@@ -69,15 +69,11 @@ const testimonials = [
     role: 'Lecturer, Software Engineering',
   },
   {
-    quote: 'The adaptive quizzes and instant feedback made studying for exams genuinely effortless.',
+    quote: 'Easy to use, and a great advantage for excelling through studies.',
     name: 'Alugbue Obinna Kennedy',
     role: 'Final Year Student',
   },
-  {
-    quote: 'A polished, modern platform that finally matches how students actually learn today.',
-    name: 'Dr. Charles Ikerionwu',
-    role: 'Head of Department',
-  },
+ 
 ];
 
 function Counter({ value, suffix = '' }) {

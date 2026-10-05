@@ -432,6 +432,25 @@ Format per entry:
   Check every router when wiring new frontend endpoints, not just the one you edited.
 - **Files involved:** `backend/routes/quizzes.js`, `backend/routes/courses.js`
 
+### 2026-10-01 — A route param NAME the controller never reads makes the handler dead (route shape)
+- **What happened:** `GET /api/courses/:id/learning-path` returns 404 for every caller, so
+  the course screen's PaceBanner, recommended-module button and per-module status badges
+  never render. The endpoint was "implemented" and simply assumed to work.
+- **Root cause:** `backend/routes/courses.js:21` declares `/:id/learning-path`, but
+  `getLearningPath` reads `req.params.courseId` (lines 300, 306, 311, 312, 321, 326, 331,
+  335) — never `req.params.id`, unlike its sibling handlers at :62/:127/:157/:187.
+  Sequelize 6 `findByPk(undefined)` short-circuits to `null`, so it falls into the
+  `404 { message: 'Course not found' }` branch. The frontend `.catch` hid it completely.
+- **Fix / prevention:** A route/handler pair is only correct if the **param names agree**;
+  matching HTTP verb + path shape is not enough. When adding a route, grep the controller
+  for every `req.params.` read and name the route parameter identically (prefer one
+  convention per router: `:id` or `:courseId`, not both). A swallowed `.catch` on a
+  personalization/analytics call is what turned a 404 into a silent feature absence —
+  log or surface unexpected non-2xx instead of discarding it.
+- **Related:** the ordering variant of this class of bug is recorded above.
+- **Files involved:** `backend/routes/courses.js`, `backend/controllers/courseController.js`,
+  `frontend/src/screens/coursesDetails.jsx`
+
 ### 2026-08-06 — Dashboards should fetch their data in parallel and handle empty states (frontend layout)
 - **What happened:** The student dashboard needed enrolled courses, quiz attempts, and
   grades, but only fetched courses.
@@ -738,6 +757,28 @@ Format per entry:
 - **Files involved:** backend `services/openaiservices.js` (rewritten), `agents/assistantAgent.js`,
   `agents/assessmentAgent.js`, `.env.example` (Groq vars documented).
 
+### 2026-10-01 — `GROQ_API_KEY || OPENAI_API_KEY` silently aims an OpenAI key at Groq (config trap)
+- **What happened:** Assessment generation and Ifeanyi chat both run on their deterministic
+  offline fallbacks with **no log line, no telemetry and no client-visible flag**. It looks
+  like "no API key configured" but the key *is* present and a request *is* being sent — it
+  just cannot succeed.
+- **Root cause:** `services/openaiservices.js:4-14` selects `provider = AI_PROVIDER || 'groq'`,
+  resolves `apiKey = GROQ_API_KEY || OPENAI_API_KEY`, and hardcodes
+  `baseURL = https://api.groq.com/openai/v1` for any provider that is not literally
+  `'openai'`. In `backend/.env` only `OPENAI_API_KEY` is set (no `GROQ_API_KEY`, no
+  `AI_PROVIDER`), so an **OpenAI key is sent to Groq's endpoint** and rejected. `client` is
+  non-null, so both agents take the LLM branch (`assessmentAgent.js:247`,
+  `assistantAgent.js` `if (client)`), hit the rejection, and fall through via a bare
+  `catch` (`assessmentAgent.js:271-273`, `assistantAgent.js:86-88`).
+- **Fix / prevention:** key, base URL and model must move as one unit. To use the OpenAI
+  key already in `.env`, set `AI_PROVIDER=openai` — the existing `OPENAI_MODEL=gpt-5.5` is
+  then also honoured, which it is not on Groq (see Gotcha 2 above). Do not let
+  `||` precedence pick a key that belongs to a different provider than the chosen base URL.
+  At minimum, log provider errors before falling back, and return a `fallback` flag in the
+  assistant's 201 body so a canned reply is distinguishable from a live one.
+- **Files involved:** `backend/services/openaiservices.js`, `backend/agents/assistantAgent.js`,
+  `backend/agents/assessmentAgent.js`, `backend/.env`
+
 ### 2026-09-28 — Course "video" materials wouldn't play (YouTube search URLs are not video streams)
 - **What happened:** Course-detail videos showed a dead player. Root cause: the content generator had stored
   `https://www.youtube.com/results?search_query=...` (an HTML search-results page) in `Materials.videoUrl`.
@@ -996,3 +1037,85 @@ Format per entry:
   virtual items).
 - **Files involved:** backend `middleware/auth.js`, `agents/contentResourceAgent.js`, `controllers/moduleController.js`,
   `routes/modules.js`.
+
+## Documentation / Mermaid
+
+### 2026-10-01 - `usecaseDiagram` and `componentDiagram` no longer exist; `A --> B : label` and `actor` are invalid in `flowchart` (documentation / mermaid)
+- **What happened:** All nine diagrams in `docs/uml.md` were authored with classic Mermaid syntax and three of
+  them failed to render: `usecaseDiagram` and `componentDiagram` were rejected as unknown diagram types, and the
+  deployment `flowchart` failed on its `actor User as "User browser"` line. A fourth fault was latent: `A --> B : label`
+  (colon after the target) is rejected by the flowchart parser, so 20 labelled edges were broken.
+- **Root cause:** Mermaid removed the classic use case and component diagrams in 10.9 (11.x only registers the
+  `usecase-beta` keyword, 12.x dropped it from the registry entirely). `actor` is only a keyword in use case,
+  component, state and sequence diagrams, not in `flowchart`. Edge text must sit *inside* the link
+  (`-->|text|`) or between its halves (`-- text -->`).
+- **Fix / prevention:** Express use case and component views with `flowchart`: use case ovals `(("..."))`,
+  actors `(["..."])`, boundaries/component groups as subgraphs, `A -->|text| B` and `A -.->|text| B` for labels.
+  Validate with `mermaid.parse()` before shipping: `npm i mermaid jsdom`, stub `window`/`document`/`navigator`
+  from jsdom (`navigator` needs `Object.defineProperty` on Node 24), extract the fenced blocks, then run the parse
+  against 10, 11 and 12 to confirm portability. `:::className` inline classes work in every version; `|` inside a
+  `classDiagram` member line is fine.
+- **Files involved:** `docs/uml.md`, `docs/requirements.md`.
+
+### 2026-10-01 — `backend/AGENTS.md` documents a database stack the code does not use (doc drift)
+- **What happened:** While writing `docs/IMPLEMENTATION.md` I nearly documented MySQL/SQLite
+  with a `DB_DIALECT=mysql|sqlite` switch, because that is what `backend/AGENTS.md` states.
+  The code has been PostgreSQL all along.
+- **Root cause:** `backend/AGENTS.md` still describes "MySQL (mysql2) or SQLite (sqlite3),
+  switched purely via `DB_DIALECT`". The real `backend/config/database.js:3-16` is
+  `new Sequelize(process.env.DATABASE_URL, { dialect: 'postgres' })` with mandatory TLS and
+  `rejectUnauthorized: false`. There is no `DB_DIALECT`, no `mysql2` and no `sqlite3`
+  dependency anywhere. The file also predates the `VERIFY before done` evidence standard, so
+  its claims are unversioned and unverified.
+- **Fix / prevention:** Agent instruction files are load-bearing and must be treated like
+  code: when a fact is wrong, correct it in place rather than routing around it, since every
+  future agent reads it first. Before trusting `AGENTS.md` for anything environment-shaped,
+  confirm it against `package.json` and the config module. Recorded as **D-14** in
+  `docs/IMPLEMENTATION.md`; the document stack there (React 19 + Express 4 + Sequelize 6 +
+  PostgreSQL/Neon) is the verified one.
+- **Files involved:** `backend/AGENTS.md`, `backend/config/database.js`, `docs/IMPLEMENTATION.md`.
+
+### 2026-10-02 — Untracked Mongoose-era `tests/test.js` makes "no test suite exists" false and unrunnable (tests / verification)
+- **What happened:** While closing out the schema/data-flow documentation I stated "no backend
+  test suite exists" (carried from the 2026-10-01 implementation-doc pass and the Backlog entry).
+  `git status` shows an **untracked** `tests/test.js` plus a root `package.json`/`package-lock.json`
+  diff that adds `jest@^29`, `supertest@^7` and a `"test": "jest --runInBand --detectOpenHandles"`
+  script. So a suite exists in the working tree even though none is committed.
+- **Root cause:** the file is stale Mongoose-era code, never run. `tests/test.js:8-9` calls
+  `User.deleteMany({})` (Sequelize has no `deleteMany`; the correct call is `User.destroy({where:{}})`)
+  and references `RoomRequest.deleteMany({})`, a model that does not exist in `backend/models/`, so
+  `beforeEach` throws `ReferenceError` before any assertion runs. It also asserts a
+  `role: 'user'` registration (`test.js:96`) that the `User.role` ENUM does not accept, and asserts
+  `res.body.data` shapes that `authController` does not return.
+- **Fix / prevention:** three rules. (1) Never assert "no tests exist" from memory or from a
+  previous doc — check `git status` for untracked test files and grep `package.json` for a `test`
+  script before claiming it. (2) A test file that is untracked and references a removed ORM is
+  worse than no test file, because it looks like coverage; treat it as absent until it has been
+  run green. (3) When reporting verification for a documentation task, say what was actually
+  executed (Mermaid `mermaid.parse()` on every fenced block) and list the runtime checks that were
+  **not** run, rather than implying the suite covers the claim.
+- **Files involved:** `tests/test.js` (untracked, not modified by this work), root `package.json`,
+  root `package-lock.json`, `backend/models/User.js`, `backend/controllers/authController.js`,
+  `.agents/TASKS.md` Backlog.
+
+### 2026-10-02 — Read/write inventories are grep-able; "read-only" endpoints can still write (data flow / audit)
+- **What happened:** Building `docs/data-flow.md` required a complete read+write inventory of all
+  17 models. Two facts that a prose reading of the controllers would have missed both surfaced from
+  one grep of model method calls across `backend/controllers/` and `backend/agents/`:
+  `GET /api/learner/recommendations` performs `Materials.update` via
+  `agents/contentResourceAgent.js:406` and `:429` (persisting resolved YouTube/audio URLs), and
+  `GET /api/forums/threads/:id` increments `Threads.viewCount` on read
+  (`controllers/forumController.js:170-171`). Both are GET handlers with side effects, so "read
+  endpoint" and "read-only" are not synonyms here.
+- **Root cause:** side effects were introduced for good reasons (cache the resolved URL so repeat
+  loads are instant; count forum views) but were added inside existing read handlers rather than as
+  explicit write endpoints, so no route map, no RBAC list and no test surfaced them.
+- **Fix / prevention:** for any data-flow or persistence audit, enumerate with a mechanical grep
+  rather than by reading handlers, e.g.
+  `Select-String -Path backend\controllers\*.js,backend\agents\*.js -Pattern '\.(findAll|findOne|findByPk|count|create|update|destroy|save|upsert|findOrCreate)\('`.
+  The read side tells you where the N+1 and full-table-scan costs are; the write side inside read
+  handlers is the highest-value thing to find. Also check `*.update(` / `*.save()` rather than only
+  `*.create()`/`*.destroy()` when auditing writes — `incrementLastLogin`-style updates are easy to miss.
+- **Files involved:** `backend/agents/contentResourceAgent.js`, `backend/controllers/forumController.js`,
+  `backend/controllers/courseController.js`, `backend/controllers/gradebookController.js`,
+  `backend/agents/learnerModellingAgent.js`, `docs/data-flow.md`.

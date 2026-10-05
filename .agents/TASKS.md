@@ -890,6 +890,72 @@ When you start, finish, or reprioritize work, update this file.
 - **Files:** `AGENTS.md`, `backend/AGENTS.md`, `frontend/AGENTS.md`,
   `.agents/LESSONS.md`, `.agents/TASKS.md`
 
+### 2026-10-01 — `docs/IMPLEMENTATION.md`: as-built implementation reference
+- **Status:** completed
+- **Summary:** Wrote a code-verified description of how EduFlow actually works,
+  covering bootstrap, auth/RBAC, the full 17-router route map, the CMS,
+  the content/resource agent, the placement-assessment lifecycle, the
+  learner model, engagement features, the assistant, and frontend wiring.
+  Documents behavior rather than intent, and flags defects instead of
+  describing them as features.
+- **Details:**
+  - Re-read the source in this pass rather than trusting earlier summaries;
+    this corrected three carried-over errors (the database is PostgreSQL,
+    `/instructorContent` is guarded with `['instructor']` not `['admin']`,
+    and `OPENAI_API_KEY` *is* set in `.env`).
+  - 14 sections, a full route table per router, and a 28-entry defect
+    register with `file:line` evidence.
+  - Six Mermaid diagrams (flowchart / sequence / class) all parse under
+    Mermaid `11.16.1`.
+  - Critical findings: `GET /api/courses/:id/learning-path` always 404s
+    (`:id` vs `req.params.courseId`); `GET /api/assignments/my-submissions`
+    is shadowed by `GET /:id`; the forum backend has no UI; and the AI
+    provider aims an OpenAI key at Groq's endpoint, so assessment and chat
+    silently run on offline fallbacks.
+  - No request was executed — every runtime statement is marked as read
+    from code, and gaps are listed under "Verification gaps".
+- **Files:** `docs/IMPLEMENTATION.md`, `.agents/LESSONS.md`,
+  `.agents/TASKS.md`
+
+### 2026-10-02 — `docs/database-schema.md` + `docs/data-flow.md`: schema and data-flow references
+- **Status:** completed
+- **Summary:** Wrote the two missing companion documents to
+  `docs/IMPLEMENTATION.md` — a field-level PostgreSQL schema reference for
+  all 17 tables, and a data-flow document covering where state lives, every
+  write path, every read path, and ten detailed flows.
+- **Details:**
+  - `docs/database-schema.md`: per-table field/type/nullability/default/ENUM
+    tables derived from the Sequelize models plus naming rules, a full ERD and
+    three domain ERDs (identity + catalog, assessment + grading, engagement +
+    communication), and sections on indexes, JSON columns, denormalized
+    `courseId` FKs, delete semantics, and the absence of a migration framework.
+  - `docs/data-flow.md`: level-0 DFD, a 5-tier state inventory (PostgreSQL /
+    process memory / local disk / browser `localStorage` / third party), a
+    complete write-path inventory (every `create`/`update`/`save`/`destroy`/
+    `findOrCreate` call site with `file:line`), a complete read-path inventory
+    flagging SQL vs JavaScript aggregation, and 10 flows (auth, enrollment +
+    placement, quiz, assignment + gradebook, activity telemetry, CMS,
+    module personalization, recommendations, assistant chat, deletion
+    semantics).
+  - Physical schema is **inferred** from Sequelize 6 models and naming
+    conventions, not read from `information_schema`; this limitation is stated
+    in the document. No request was executed against a running server or DB.
+  - Verified: 4 `erDiagram` blocks in `database-schema.md` and 11 blocks in
+    `data-flow.md` all parse under Mermaid `11.16.1`. Secret-pattern scan of
+    both files clean.
+  - Notable findings carried into these docs: `Enrollments` has exactly one
+    writer (`assessmentController.js:101`, from assessment submit — not from
+    the enroll route); the gradebook formula sums *all* submission rows while
+    counting `maxPoints` once per assignment, so a resubmission is double
+    counted; `QuizAttempt` is read by the calculator but excluded from
+    `overallGrade`; the answer key lives in a public JSON column
+    (`Quizzes.questions.correctAnswer`) and in process memory
+    (`assessmentStore.js`) with opposite exposure; and four aggregations
+    (leaderboard, learner model, consistency report, learning path) fan out
+    across 6-8 tables and roll up in JavaScript.
+- **Files:** `docs/database-schema.md`, `docs/data-flow.md`,
+  `.agents/LESSONS.md`, `.agents/TASKS.md`
+
 ---
 
 ## Backlog
@@ -897,3 +963,22 @@ When you start, finish, or reprioritize work, update this file.
 - **Future:** Replace Mongoose-era error branches in `backend/middleware/errorHandler.js`
   (currently checks `ValidationError`, `11000`, `CastError` which do not apply to
   Sequelize).
+- **Fix (trivial, high impact):** rename `routes/courses.js:21` to
+  `/:courseId/learning-path` so `getLearningPath` receives the param it reads;
+  move `GET /my-submissions` (`routes/assignments.js:24`) above `GET /:id`
+  (`:20`).
+- **Fix (config):** set `AI_PROVIDER=openai` in `backend/.env` so the existing
+  `OPENAI_API_KEY`/`OPENAI_MODEL=gpt-5.5` pair is actually used instead of
+  being sent to Groq and silently falling back.
+- **Fix (RBAC):** `routes/courses.js:20` should use `isInstructorOrAdmin`, not
+  `isInstructor`, or lecturers permanently see an empty course list on the
+  consistency screen.
+- **Fix (docs):** `backend/AGENTS.md` still documents MySQL/SQLite +
+  `DB_DIALECT`; the code is PostgreSQL via `DATABASE_URL`.
+- **Future:** add a backend test suite — a single route smoke test would have
+  caught both registration-order bugs. Note: an **untracked** `tests/test.js`
+  plus root `jest`/`supertest` deps now exist in the working tree (2026-10-02),
+  but the file is stale Mongoose-era code (`User.deleteMany({})`, references a
+  non-existent `RoomRequest` model) and cannot run as-is. Rewrite it against
+  Sequelize (`User.destroy({ where: {} })`) or delete it, so the repo does not
+  advertise coverage it does not have.
