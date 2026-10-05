@@ -1203,3 +1203,42 @@ Format per entry:
      correctly outrank the inferred provider.
 - **Files involved:** `backend/services/openaiservices.js`, `backend/agents/assistantAgent.js`,
   `backend/agents/assessmentAgent.js`, `backend/.env`.
+
+---
+
+## Assessment / recommendations
+
+### 2026-10-05 - A module ranking is not an explanation: group missed questions by topic before judging weakness (assessment / agents)
+
+- **What happened:** The assessment result screen showed every wrong answer and a ranked
+  "Review these modules" list. A feature was requested to *identify what the student is weak
+  at, point it out, and optionally send them straight there*. Reading the existing code showed
+  there was nothing to extend — the aggregation that names a weakness did not exist anywhere.
+- **Root cause:** `evaluateDetailed` returns a **flat** `weaknesses` array (one entry per missed
+  question) and `recommendModules` counts misses **per module**. Neither groups by topic nor
+  states severity, so a student could see "you missed 4 questions" but never "JavaScript is your
+  gap — it was 100% of what we asked about that topic, so fix it first".
+- **Fix / prevention:**
+  1. **Severity must be a ratio inside its own group, never a raw count.** Topic sizes are
+     unequal, so raw counts invert the meaning: 2-of-2 is a gap, 2-of-6 is noise. `identifyWeaknesses`
+     ranks `critical / moderate / minor` from `missed / attempted-per-topic`.
+  2. **Never group by a field that can be `null`.** `pickQuestions` hard-codes `topic: null` for
+     every LLM-generated question (`assessmentAgent.js:258`), so `topic` is *not* guaranteed even
+     though every bank question has one. The group key needs a fallback chain
+     (`topic` → `moduleTitle` → `'Untagged topic'`).
+  3. **`missRate` must be computed against the full `results` array, not the misses.** Deriving
+     it from the missed subset alone always yields exactly `100%` for every group, which *looks*
+     correct and silently destroys the severity signal.
+  4. **A ranking is not an explanation.** Completion criterion for this kind of feature: if a
+     student cannot name their own weak area after reading the screen, it is not done.
+  5. Emit a structured `remedy` (`study-module` when a module covers the topic, otherwise
+     `review-questions`) instead of a pre-built path — the client already owns the
+     `/courses/:id?module=` convention, so do not duplicate route knowledge in the API.
+- **Verification:** exercised the **real** `submitAssessment` handler (not a stub) by seeding an
+  entry in `activeAssessments` and passing `req.user = null`, which skips the `Enrollment` /
+  `AssessmentAttempt` writes, so the live Neon DB stays untouched. Three cases: all-correct →
+  empty analysis + empty summary + `studyNow.available: false`; mixed → one `critical` group with
+  a working module link; all-wrong → three groups correctly capped and ranked.
+- **Files involved:** `backend/agents/recommendationAgent.js` (`identifyWeaknesses`,
+  `weaknessSummary`), `backend/controllers/assessmentController.js` (`submitAssessment` response),
+  `frontend/src/screens/studentDashboard.jsx` (result-phase weakness panel + `goToWeakness`).

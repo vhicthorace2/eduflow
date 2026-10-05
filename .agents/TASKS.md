@@ -1073,3 +1073,30 @@ When you start, finish, or reprioritize work, update this file.
   non-existent `RoomRequest` model) and cannot run as-is. Rewrite it against
   Sequelize (`User.destroy({ where: {} })`) or delete it, so the repo does not
   advertise coverage it does not have.
+- ~~**Feature (recommendation agent):** after gathering the failed questions,
+  identify the student's weakness, point it out to them, and optionally have
+  them immediately learn those areas.~~ **Done 2026-10-05:** added
+  `identifyWeaknesses()` + `weaknessSummary()` to
+  `backend/agents/recommendationAgent.js`. Missed questions are grouped by
+  `topic` (falling back to `moduleTitle`, then `'Untagged topic'`, because
+  `pickQuestions` hard-codes `topic: null` for LLM questions), severity is
+  `critical / moderate / minor` derived from the **per-topic miss rate** rather
+  than a raw count, and the top 3 are returned with a `remedy` of
+  `study-module` or `review-questions`. `submitAssessment` now returns
+  `weaknessAnalysis`, `weaknessSummary`, and `studyNow`. The result screen
+  renders a "Where you need work" panel with a severity badge, a collapsible
+  list of the missed questions, and a "Study this now →" button that deep-links
+  to `/courses/:id?module=`. No schema change — the analysis is response-only,
+  which keeps `docs/database-schema.md` accurate.
+  - **Follow-up (optional):** the analysis is not persisted. `AssessmentAttempt`
+    has 4 JSON columns (`answers`, `results`, `weaknesses`, `moduleRecommendations`)
+    and `weaknesses` currently holds the raw missed questions, so storing the
+    analysis would need a **new** column via the existing `ensureColumn` pattern
+    in `backend/config/database.js` — not an overwrite of `weaknesses`.
+    Worth doing only if weakness trends across attempts are ever needed.
+- **Fix (related, still open):** with LLM questions actually reaching the
+  student, `pickQuestions` assigns every generated question `topic: null`
+  (`backend/agents/assessmentAgent.js:258`), so weakness grouping will fall back
+  to `moduleTitle` for the whole set. Ask the model for a `topic` per question
+  (and let `normalizeQuestions` accept it) at the same time as the
+  `answer` → `correctAnswer` alias fix below.

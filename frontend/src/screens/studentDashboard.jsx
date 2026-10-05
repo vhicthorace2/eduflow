@@ -263,6 +263,14 @@ function StudentDashboard() {
     if (courseId) navigate(moduleOrder ? `/courses/${courseId}?module=${moduleOrder}` : `/courses/${courseId}`);
   };
 
+  // Jump straight to the module that covers a named weak area, so the student can
+  // fix the gap the result screen just pointed at.
+  const goToWeakness = (moduleOrder) => {
+    const courseId = wizard.course?.id || wizard.result?.studyNow?.courseId;
+    closeWizard();
+    if (courseId && moduleOrder) navigate(`/courses/${courseId}?module=${moduleOrder}`);
+  };
+
   useEffect(() => {
     if (wizard.phase !== 'questions' || !wizard.assessmentId) return undefined;
 
@@ -765,6 +773,69 @@ function StudentDashboard() {
                     <p className="mt-3 text-sm font-medium text-danger">Time&apos;s up — your answers were submitted automatically.</p>
                   )}
                 </div>
+
+                {(wizard.result.weaknessAnalysis || []).length > 0 && (
+                  <div className="mt-8 rounded-2xl border border-orange-400/30 bg-orange-400/10 p-5">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent-mid">Where you need work</p>
+                    {wizard.result.weaknessSummary && (
+                      <p className="mt-2 text-sm text-secondary">{wizard.result.weaknessSummary}</p>
+                    )}
+                    <ul className="mt-4 space-y-3">
+                      {(wizard.result.weaknessAnalysis || []).map((weakness) => (
+                        <li key={weakness.label} className="rounded-xl border border-line bg-card-deep p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-content">{weakness.label}</p>
+                              <p className="mt-1 text-xs text-muted">
+                                Missed {weakness.missed} of {weakness.attempted} questions
+                              </p>
+                            </div>
+                            <span
+                              className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+                                weakness.severity === 'critical'
+                                  ? 'bg-red-400/10 text-red-400'
+                                  : weakness.severity === 'moderate'
+                                    ? 'bg-amber-400/10 text-amber-400'
+                                    : 'bg-orange-400/10 text-orange-400'
+                              }`}
+                            >
+                              {weakness.severity}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-sm text-secondary">{weakness.detail}</p>
+
+                          {weakness.questions.length > 0 && (
+                            <details className="mt-3">
+                              <summary className="cursor-pointer text-xs font-semibold text-accent-soft">
+                                Show the {weakness.questions.length} question{weakness.questions.length === 1 ? '' : 's'} you missed
+                              </summary>
+                              <ul className="mt-2 space-y-2">
+                                {weakness.questions.map((missedQuestion, missedIndex) => (
+                                  <li key={missedIndex} className="text-xs text-muted">
+                                    <span className="text-secondary">{missedQuestion.question}</span>
+                                    <span className="mt-0.5 block text-emerald-400/90">
+                                      Correct answer: {missedQuestion.correctAnswer}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+
+                          {weakness.remedy.type === 'study-module' && (
+                            <button
+                              onClick={() => goToWeakness(weakness.remedy.moduleOrder)}
+                              className="mt-3 w-full rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-orange-400"
+                            >
+                              Study this now →
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {(wizard.result.moduleRecommendations || []).length > 0 && (
                   <div className="mt-8 rounded-2xl border border-orange-400/30 bg-orange-400/10 p-5">

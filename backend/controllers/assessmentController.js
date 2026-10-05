@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { generateStudentTest } = require('../agents/assessmentAgent.js');
 const { evaluateAnswers, evaluateDetailed } = require('../agents/evaluationAgent.js');
-const { recommend, recommendModules } = require('../agents/recommendationAgent.js');
+const { recommend, recommendModules, identifyWeaknesses, weaknessSummary } = require('../agents/recommendationAgent.js');
 const { Course, Module, Enrollment, AssessmentAttempt } = require('../models');
 const { activeAssessments, sanitizeQuestions } = require('../agents/assessmentStore.js');
 
@@ -87,6 +87,12 @@ exports.submitAssessment = async (req, res, next) => {
     const moduleRecommendations = recommendModules(weaknesses, assessment.modules, levelInfo.level);
     const primary = moduleRecommendations[0];
 
+    // Name the specific gaps behind the score and pair each with the module that
+    // covers it, so the student can be pointed at the fix instead of only shown
+    // which answers were wrong.
+    const weaknessAnalysis = identifyWeaknesses(weaknesses, results, assessment.modules);
+    const topWeakness = weaknessAnalysis[0] || null;
+
     const elapsed = Math.max(0, Math.round((Date.now() - (assessment.startedAt || Date.now())) / 1000));
     const usedSeconds = Number.isInteger(timeSpent) ? Math.min(timeSpent, assessment.timeLimit) : elapsed;
 
@@ -149,6 +155,19 @@ exports.submitAssessment = async (req, res, next) => {
       recommendedModule: primary ? primary.moduleTitle : levelInfo.recommendedModule,
       recommendedModuleOrder: primary ? primary.moduleOrder : (levelInfo.recommendedModuleOrder ?? null),
       recommendedModules: moduleRecommendations.map((r) => ({ order: r.moduleOrder, title: r.moduleTitle })),
+      weaknessAnalysis,
+      weaknessSummary: weaknessSummary(weaknessAnalysis),
+      // Shortcut for the "learn this now" action. The path itself is built by the
+      // client, which already owns the /courses/:id?module= convention.
+      studyNow: topWeakness && topWeakness.remedy.type === 'study-module'
+        ? {
+            available: true,
+            courseId: course ? course.id : null,
+            moduleOrder: topWeakness.remedy.moduleOrder,
+            moduleTitle: topWeakness.remedy.moduleTitle,
+            label: topWeakness.label
+          }
+        : { available: false },
       attemptId: attempt ? attempt.id : null
     });
   } catch (error) {
