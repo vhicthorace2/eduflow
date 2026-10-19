@@ -12,6 +12,8 @@ import Login from './screens/login.jsx';
 import ForgotPassword from './screens/forgotPassword.jsx';
 import ResetPassword from './screens/resetPassword.jsx';
 import VerifyEmail from './screens/verifyEmail.jsx';
+import PrivacyPolicy from './screens/privacyPolicy.jsx';
+import TermsOfService from './screens/termsOfService.jsx';
 import Profile from './screens/profile.jsx';
 import CourseDetails from './screens/coursesDetails.jsx';
 import AdminDashboard from './screens/adminDashboard.jsx';
@@ -64,6 +66,8 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/verify-email/:token" element={<VerifyEmail />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/courses" element={<CourseCatalog />} />
       <Route path="/courses/:id" element={<CourseDetails />} />

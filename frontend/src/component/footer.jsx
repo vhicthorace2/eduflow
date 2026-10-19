@@ -35,8 +35,8 @@ function Footer() {
         <div className='mt-12 flex flex-col items-center justify-between gap-4 border-t border-line pt-8 text-sm text-faint sm:flex-row'>
           <p>© 2026 EduFlow. All rights reserved.</p>
           <div className='flex gap-6'>
-            <a href='#' className='transition hover:text-accent'>Privacy</a>
-            <a href='#' className='transition hover:text-accent'>Terms</a>
+            <a href='/privacy' className='transition hover:text-accent'>Privacy</a>
+            <a href='/terms' className='transition hover:text-accent'>Terms</a>
             <a href='#' className='transition hover:text-accent'>About</a>
           </div>
         </div>

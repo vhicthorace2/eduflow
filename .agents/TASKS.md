@@ -10,6 +10,24 @@ When you start, finish, or reprioritize work, update this file.
 
 ## Completed
 
+### 2026-10-19 — Privacy Policy and Terms of Service pages
+- **Status:** completed
+- **Summary:** Added the two legal pages the footer was already linking to (both were dead `href='#'`).
+  Standard, readable policy/ToS written for an education platform: privacy covers account info, learning
+  activity, Google sign-in data, local-storage preferences, the service providers it is shared with (hosting,
+  email, AI recommendation providers), retention, security, user rights, children's privacy, transfers; ToS
+  covers eligibility, accounts (incl. the email-verification gate), acceptable use, IP, academic integrity
+  (explicitly that assessments/recommendations are AI-generated and may be inaccurate), user content, third-party
+  services, fees, termination, disclaimers, liability, governing law.
+- **Frontend:** new `screens/privacyPolicy.jsx` (`/privacy`) and `screens/termsOfService.jsx` (`/terms`),
+  matching the existing legal-adjacent layout (landing Navbar + Footer, `shadow-panel` card, theme tokens);
+  both routes registered as public in `App.jsx`; footer Privacy/Terms links now point at them.
+- **Verified:** `npm run lint` + `npm run build` green.
+- **Files:** `frontend/src/screens/{privacyPolicy,termsOfService}.jsx` (new), `frontend/src/App.jsx`,
+  `frontend/src/component/footer.jsx`
+- **Follow-up:** two placeholders must be filled before launch — `[contact email]` in both pages and
+  `[governing jurisdiction]` in `termsOfService.jsx`. Legal review recommended; this is a generated draft.
+
 ### 2026-10-19 — Auth upgrade: Google sign-in, email verification, forgot/reset password
 - **Status:** completed (backend + frontend); email delivery blocked by invalid SMTP credentials (see Follow-up)
 - **Summary:** Three auth capabilities shipped: (1) "Forgot password?" on the login page driving the
