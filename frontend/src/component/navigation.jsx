@@ -43,7 +43,7 @@ function Navbar({ landing }) {
         className='mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8'
         aria-label='Primary'
       >
-        <NavLink to="/" end className="w-5 h-5 rounded-full self-start shrink-0">
+        <NavLink to="/" end className="w-6 h-6 rounded-full self-start shrink-0">
           <a aria-current="page" class="font-display text-2xl font-semibold tracking-tight text-content active" href="/" data-discover="true">
             EduFlow
           </a>
