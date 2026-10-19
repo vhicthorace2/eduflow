@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../component/navigation.jsx';
 import Footer from '../component/footer.jsx';
 import PasswordInput from '../component/passwordInput.jsx';
+import GoogleAuthButton from '../component/googleAuthButton.jsx';
 import api, { tokenStore, userStore } from '../api/client.js';
 import studyImg from '../assets/study.jpg';
 
@@ -11,7 +12,24 @@ function Login() {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [authConfig, setAuthConfig] = useState({ googleEnabled: false, googleClientId: null });
+  const [verification, setVerification] = useState({ needed: false, email: '' });
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/auth/config')
+      .then((data) => {
+        if (!cancelled) {
+          setAuthConfig({ googleEnabled: data.googleEnabled, googleClientId: data.googleClientId });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -29,6 +47,7 @@ function Login() {
     setLoading(true);
     setIsError(false);
     setMessage('');
+    setVerification({ needed: false, email: '' });
 
     try {
       const data = await api.post('/auth/login', {
@@ -41,8 +60,40 @@ function Login() {
     } catch (error) {
       setIsError(true);
       setMessage(error.message || 'Login failed. Please try again.');
+      if (error.data?.requiresVerification) {
+        setVerification({ needed: true, email: formData.email });
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential) => {
+    setLoading(true);
+    setIsError(false);
+    setMessage('');
+    try {
+      const data = await api.post('/auth/google', { credential });
+      tokenStore.set(data.token);
+      userStore.set(data.user);
+      redirectByRole(data.user.role);
+    } catch (error) {
+      setIsError(true);
+      setMessage(error.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      const data = await api.post('/auth/resend-verification', { email: verification.email });
+      setIsError(false);
+      setMessage(data.message || 'Verification email sent.');
+      setVerification({ needed: false, email: '' });
+    } catch (error) {
+      setIsError(true);
+      setMessage(error.message || 'Could not resend the verification email.');
     }
   };
 
@@ -65,7 +116,27 @@ function Login() {
               Access your courses, progress, and dashboard.
             </p>
 
-            <form className='mt-8 space-y-5' onSubmit={handleSubmit}>
+            <div className='mt-8'>
+              <GoogleAuthButton
+                clientId={authConfig.googleClientId}
+                text='signin_with'
+                onCredential={handleGoogleCredential}
+                onUnavailable={() => {
+                  setIsError(true);
+                  setMessage('Google sign-in is not configured yet. Please sign in with your email instead.');
+                }}
+              />
+            </div>
+
+            <div className='my-6 flex items-center gap-4'>
+              <span className='h-px flex-1 bg-line-strong' />
+              <span className='text-xs font-semibold uppercase tracking-[0.25em] text-muted'>or</span>
+              <span className='h-px flex-1 bg-line-strong' />
+            </div>
+
+            <p className='text-sm font-semibold text-secondary'>Sign in with Email</p>
+
+            <form className='mt-4 space-y-5' onSubmit={handleSubmit}>
               <div>
                 <label className='mb-1.5 block text-sm font-medium text-secondary' htmlFor='email'>
                   Email address
@@ -95,6 +166,11 @@ function Login() {
                   className={inputClass}
                   placeholder="Enter your password"
                 />
+                <div className='mt-2 text-right'>
+                  <Link to='/forgot-password' className='text-sm font-semibold text-accent hover:text-accent-soft'>
+                    Forgot password?
+                  </Link>
+                </div>
               </div>
 
               <button
@@ -116,6 +192,16 @@ function Login() {
               >
                 {message}
               </p>
+            ) : null}
+
+            {verification.needed ? (
+              <button
+                type='button'
+                onClick={handleResendVerification}
+                className='mt-3 w-full rounded-xl border border-line-strong bg-card-strong px-4 py-3 text-sm font-semibold text-secondary transition hover:bg-card-hover'
+              >
+                Resend verification email
+              </button>
             ) : null}
 
             <p className='mt-8 text-center text-sm text-muted'>

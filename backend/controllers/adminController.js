@@ -77,7 +77,8 @@ exports.createUser = async (req, res, next) => {
       name,
       email,
       password,
-      role: role || 'student'
+      role: role || 'student',
+      isEmailVerified: true
     });
 
     res.status(201).json({

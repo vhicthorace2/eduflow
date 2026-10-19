@@ -10,6 +10,53 @@ When you start, finish, or reprioritize work, update this file.
 
 ## Completed
 
+### 2026-10-19 — Auth upgrade: Google sign-in, email verification, forgot/reset password
+- **Status:** completed (backend + frontend); email delivery blocked by invalid SMTP credentials (see Follow-up)
+- **Summary:** Three auth capabilities shipped: (1) "Forgot password?" on the login page driving the
+  existing reset backend plus a new `/reset-password/:token` screen, (2) "Continue with Google" on both
+  login and signup (real Google ID-token verification, env-gated on `GOOGLE_CLIENT_ID`) alongside a
+  "sign in/sign up with Email" path, and (3) a verification-before-login gate: new signups must click an
+  emailed link, Google sign-ups are Google-verified, admin-created and pre-existing accounts pass.
+- **Backend:**
+  - `models/User.js`: new `isEmailVerified` (BOOLEAN, default `true` so existing/admin rows stay usable),
+    `emailVerificationToken`, `emailVerificationExpires`, `googleId`; `createEmailVerificationToken()`
+    (random hex returned, sha256 stored, 24h expiry).
+  - `config/database.js`: idempotent `ensureColumn`/`ensureSchema` re-added (create-only `sync()` never
+    alters existing tables) to add the four `Users` columns.
+  - `utils/email.js`: `sendVerificationEmail` (orange `#f97316` CTA, `${CLIENT_URL}/verify-email/{token}`).
+  - `services/googleAuth.js` (new): dependency-free Google ID-token verification — JWKS from
+    `googleapis/oauth2/v3/certs`, `crypto.createPublicKey({format:'jwk'})`, `jwt.verify` RS256 with
+    audience `GOOGLE_CLIENT_ID` + accepted issuers, 1h key cache with one forced refresh on unknown `kid`.
+  - `controllers/authController.js`: email normalization (`lower(email)` parameterized lookup, no `Op.like`);
+    `register` creates an unverified user, emails a link, returns **no token**, and rolls back (destroys)
+    the user if the send fails; `login` returns `403 { requiresVerification: true }` when unverified;
+    new `verifyEmail` (sha256 token match, marks verified, emails welcome, returns token),
+    `resendVerification` (generic 200, no enumeration), `googleAuth` (links/creates user, random password
+    for Google-only accounts), `getAuthConfig`; `forgotPassword` now generic-200 (no enumeration).
+  - `routes/auth.js`: `GET /config`, `POST /verify-email/:token`, `POST /resend-verification`,
+    `POST /google`.
+  - `controllers/adminController.js`: admin-created users get `isEmailVerified: true`.
+  - `.env.example`: documented optional `GOOGLE_CLIENT_ID` (+ commented `GOOGLE_CLIENT_SECRET`).
+- **Frontend:** new `component/googleAuthButton.jsx` (loads GIS, renders official button, fallback
+  "not configured" button); `login.jsx` (forgot link, Google button, "sign in with Email", resend-verification
+  on 403) and `signup.jsx` (Google button, "sign up with Email", "check your email" panel instead of
+  auto-login); new screens `forgotPassword.jsx`, `resetPassword.jsx` (`/reset-password/:token`),
+  `verifyEmail.jsx` (`/verify-email/:token`); routes registered in `App.jsx`.
+- **Verified:** live E2E on Neon (temp user, cleaned up) — `GET /auth/config` 200; unverified login 403
+  `requiresVerification`; `verify-email` valid 200 + token; verified login 200; token reuse 400;
+  forgot/resend unknown 200 generic; `/auth/google` unconfigured 503. `ensureColumn` logged adding all four
+  columns. Frontend `npm run lint` + `npm run build` green; `node --check` clean on all changed backend files.
+- **Follow-up (BLOCKER):** the configured SMTP account is rejected by Gmail — `535-5.7.8 Username and
+  Password not accepted` (surfaced via the fire-and-forget `sendWelcomeEmail` in `verifyEmail`). With SMTP
+  broken, `register` intentionally returns 500 and deletes the row, so **new signups cannot complete** until
+  `EMAIL_PASSWORD` is corrected (a Google app password). Also `GOOGLE_CLIENT_ID` must be set (with the
+  frontend origin as an Authorized JavaScript origin) before the Google button is live.
+- **Files:** `backend/models/User.js`, `backend/config/database.js`, `backend/utils/email.js`,
+  `backend/services/googleAuth.js` (new), `backend/controllers/authController.js`, `backend/routes/auth.js`,
+  `backend/controllers/adminController.js`, `backend/.env.example`,
+  `frontend/src/component/googleAuthButton.jsx` (new), `frontend/src/screens/{login,signup}.jsx`,
+  `frontend/src/screens/{forgotPassword,resetPassword,verifyEmail}.jsx` (new), `frontend/src/App.jsx`
+
 ### 2026-09-30 — Content resource agent: dynamic preference-based feed + student dashboard "Recommended for You"
 - **Status:** completed
 - **Summary:** The content agent now generates a dynamic, preference-weighted resource feed — video learners get

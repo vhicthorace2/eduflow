@@ -6,9 +6,23 @@ const {
   getMe,
   forgotPassword,
   resetPassword,
-  updatePassword
+  updatePassword,
+  verifyEmail,
+  resendVerification,
+  googleAuth,
+  getAuthConfig
 } = require('../controllers/authController');
 const auth = require('../middleware/auth');
+
+// Public authentication capability discovery (which sign-in methods are enabled).
+router.get('/config', getAuthConfig);
+
+// Email-address verification (link sent by /register).
+router.post('/verify-email/:token', verifyEmail);
+router.post('/resend-verification', resendVerification);
+
+// Google Identity Services sign-in / sign-up.
+router.post('/google', googleAuth);
 
 /**
  * @openapi

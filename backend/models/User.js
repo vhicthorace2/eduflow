@@ -65,6 +65,25 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: true
   },
+  // Defaults to true so accounts created before verification existed (and by an
+  // admin) stay usable; self-registration explicitly sets it to false.
+  isEmailVerified: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true
+  },
+  emailVerificationToken: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  emailVerificationExpires: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  googleId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   preferences: {
     type: DataTypes.JSON,
     allowNull: true,
@@ -99,6 +118,20 @@ User.prototype.createPasswordResetToken = function() {
   this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   
   return resetToken;
+};
+
+// Instance method to generate an email verification token
+User.prototype.createEmailVerificationToken = function() {
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+
+  this.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+
+  this.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+  return verificationToken;
 };
 
 // Instance method to update last login

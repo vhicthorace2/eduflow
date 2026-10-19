@@ -92,7 +92,45 @@ const sendWelcomeEmail = async (email, name) => {
   }
 };
 
+/**
+ * Send email address verification email
+ */
+const sendVerificationEmail = async (email, verificationToken, name) => {
+  try {
+    const transporter = createTransporter();
+
+    const verifyUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/verify-email/${verificationToken}`;
+
+    const mailOptions = {
+      from: `"Education Platform" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Verify your email address',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Verify your email address</h2>
+          <p>Hi ${name || 'there'},</p>
+          <p>Thanks for creating an Education Platform account. Please confirm this email address so we can finish setting up your account.</p>
+          <a href="${verifyUrl}" style="display: inline-block; padding: 12px 24px; background-color: #f97316; color: white; text-decoration: none; border-radius: 4px; margin: 16px 0;">Verify Email</a>
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #666;">${verifyUrl}</p>
+          <p><strong>This link will expire in 24 hours.</strong></p>
+          <p>If you did not create this account, you can safely ignore this email.</p>
+          <hr style="margin: 24px 0; border: none; border-top: 1px solid #eee;">
+          <p style="color: #999; font-size: 12px;">This is an automated email. Please do not reply.</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendPasswordResetEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendVerificationEmail
 };

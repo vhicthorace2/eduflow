@@ -1242,3 +1242,66 @@ Format per entry:
 - **Files involved:** `backend/agents/recommendationAgent.js` (`identifyWeaknesses`,
   `weaknessSummary`), `backend/controllers/assessmentController.js` (`submitAssessment` response),
   `frontend/src/screens/studentDashboard.jsx` (result-phase weakness panel + `goToWeakness`).
+
+---
+
+## Auth / email verification
+
+### 2026-10-19 - A "successful" email flow hid a dead SMTP account behind a fire-and-forget send (auth / email)
+
+- **What happened:** The email-verification and password-reset flows looked correct and all their HTTP
+  endpoints returned the expected JSON during the E2E run, yet a stack trace for the email send appeared
+  *after* the test had finished and the process was shutting down.
+- **Root cause:** `verifyEmail` calls `sendWelcomeEmail(...).catch(() => {})` — deliberately non-blocking —
+  so a failed SMTP send cannot fail the request. The underlying error was Gmail rejecting the configured
+  account: `535-5.7.8 Username and Password not accepted`. `.env` "has" `EMAIL_HOST/PORT/USER/PASSWORD`, which
+  is not the same as credentials that authenticate. `forgotPassword` uses the same transport, so
+  **password reset email is dead too**, and `register` is designed to hard-fail (500 + destroy row) while
+  SMTP is broken.
+- **Fix / prevention:**
+  1. Presence of `EMAIL_*` vars is **not** proof email works. Before claiming any mail-backed flow works,
+     trigger one send and assert it resolves — a rejected credential only shows up at send time.
+  2. A fire-and-forget `.catch(() => {})` is right for a *secondary* email (welcome), but never silently
+     swallow the *primary* one. Here `register` correctly awaits `sendVerificationEmail` and rolls the user
+     back on failure — keep that asymmetry intentional.
+  3. Never "fix" this by editing `.env` credentials (user-specific). Report it; the account must issue an
+     app password.
+- **Verification:** E2E on Neon proved every endpoint's status/shape (verify-email 200, unverified login 403,
+  reuse 400, config 200, google-unconfigured 503) *and* surfaced the `EAUTH` 535 only because the run was
+  long enough to reach SMTP. Test user destroyed afterward.
+- **Files involved:** `backend/utils/email.js`, `backend/controllers/authController.js`, `backend/.env`.
+
+### 2026-10-19 - Adding a verified-by-default boolean is the only safe column default for an existing table (auth / migrations)
+
+- **What happened:** Email verification needed a flag on `Users`, an existing table populated with real
+  accounts. A `defaultValue: false` would have locked every existing user out of login (the new gate blocks
+  unverified users).
+- **Root cause / rule:** `sequelize.sync()` is create-only in this repo, so a new column reaches an existing
+  table **only** via the idempotent `ensureColumn` helper (see the earlier migration lesson). The `ALTER
+  TABLE ... ADD COLUMN ... DEFAULT true` backfills the column; combined with `isEmailVerified: false`
+  explicitly set by `register`, new signups are gated while every pre-existing row stays usable.
+- **Prevention:** When introducing a boolean that *gates* access, choose the default so that the set of
+  already-present rows keeps its current behaviour, and set the restrictive value explicitly at the one
+  creation site that must be restrictive (`register`) rather than relying on the column default.
+- **Files involved:** `backend/config/database.js` (`ensureSchema`), `backend/models/User.js`.
+
+### 2026-10-19 - Verify Google ID tokens with Node crypto + JWKS; gate the button on server config, not a Vite var (auth / google)
+
+- **What happened:** "Continue with Google" was requested with no `google-auth-library`/Passport installed
+  and no `GOOGLE_CLIENT_ID` present.
+- **Solution / rules:**
+  1. **No new dependency needed.** Google ID tokens are RS256 JWTs; import the matching JWK with
+     `crypto.createPublicKey({ key: jwk, format: 'jwk' })` (Node 15+) and `jwt.verify` with
+     `algorithms: ['RS256']`, `audience: GOOGLE_CLIENT_ID`, and both accepted issuers
+     (`https://accounts.google.com`, `accounts.google.com`). Refresh the cached JWKS once on an unknown
+     `kid`; treat `email_verified === false` as a rejection.
+  2. **Env-gate, and make the gate discoverable.** `GET /api/auth/config` returns
+     `{ googleEnabled, googleClientId }` so the client loads the GIS script with the **server's** client ID
+     (single source of truth) and renders a clear "not configured" path when unset — no `VITE_` build var,
+     no redeploy to enable it. The frontend still renders a Google button either way, so the UX from the
+     spec is visible before configuration exists.
+  3. A Google-only account still needs `User.password` (required + `len>=6`): generate a random hidden
+     password (`crypto.randomBytes(32)`) instead of loosening the model validators; the account can set a
+     real password later via forgot-password.
+- **Files involved:** `backend/services/googleAuth.js`, `backend/controllers/authController.js`
+  (`googleAuth`, `getAuthConfig`), `frontend/src/component/googleAuthButton.jsx`, `.env.example`.

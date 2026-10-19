@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../component/navigation.jsx';
 import Footer from '../component/footer.jsx';
 import PasswordInput from '../component/passwordInput.jsx';
+import GoogleAuthButton from '../component/googleAuthButton.jsx';
 import { markNewUser } from '../component/sessionFlags.js';
 import api, { tokenStore, userStore } from '../api/client.js';
 import studyImg from '../assets/study.jpg';
@@ -18,11 +19,57 @@ function Signup() {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [authConfig, setAuthConfig] = useState({ googleEnabled: false, googleClientId: null });
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/auth/config')
+      .then((data) => {
+        if (!cancelled) {
+          setAuthConfig({ googleEnabled: data.googleEnabled, googleClientId: data.googleClientId });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleGoogleCredential = async (credential) => {
+    setLoading(true);
+    setIsError(false);
+    setMessage('');
+    try {
+      const data = await api.post('/auth/google', { credential });
+      tokenStore.set(data.token);
+      userStore.set(data.user);
+      markNewUser();
+      navigate(data.user.role === 'instructor' || data.user.role === 'lecturer' ? '/instructorDashboard' : '/studentDashboard');
+    } catch (error) {
+      setIsError(true);
+      setMessage(error.message || 'Google sign-up failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      const data = await api.post('/auth/resend-verification', { email: pendingEmail });
+      setIsError(false);
+      setMessage(data.message || 'Verification email sent.');
+    } catch (error) {
+      setIsError(true);
+      setMessage(error.message || 'Could not resend the verification email.');
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -44,16 +91,9 @@ function Signup() {
         password: formData.password,
         role: formData.role,
       });
-      tokenStore.set(data.token);
-      userStore.set(data.user);
-
-      const me = await api.get('/auth/me');
-      if (!me || !me.user) {
-        throw new Error('Could not authenticate after signup.');
-      }
-      userStore.set(me.user);
-      markNewUser();
-      navigate(me.user.role === 'instructor' ? '/instructorDashboard' : '/studentDashboard');
+      // Registration no longer signs the user in: the account stays blocked
+      // until the emailed verification link is opened.
+      setPendingEmail(data.email || formData.email);
     } catch (error) {
       setIsError(true);
       setMessage(error.message || 'Registration failed. Please try again.');
@@ -106,7 +146,47 @@ function Signup() {
               Start your learning journey in just a few steps.
             </p>
 
-            <form className='mt-8 space-y-5' onSubmit={handleSubmit}>
+            <div className='mt-8'>
+              <GoogleAuthButton
+                clientId={authConfig.googleClientId}
+                text='signup_with'
+                onCredential={handleGoogleCredential}
+                onUnavailable={() => {
+                  setIsError(true);
+                  setMessage('Google sign-up is not configured yet. Please sign up with your email instead.');
+                }}
+              />
+            </div>
+
+            <div className='my-6 flex items-center gap-4'>
+              <span className='h-px flex-1 bg-line-strong' />
+              <span className='text-xs font-semibold uppercase tracking-[0.25em] text-muted'>or</span>
+              <span className='h-px flex-1 bg-line-strong' />
+            </div>
+
+            {pendingEmail ? (
+              <div className='mt-2 rounded-2xl border border-line-strong bg-card-strong p-6'>
+                <h3 className='text-lg font-semibold text-secondary'>Check your email</h3>
+                <p className='mt-2 text-sm leading-6 text-muted'>
+                  We sent a verification link to <span className='font-semibold text-secondary'>{pendingEmail}</span>.
+                  Open it to activate your account, then sign in.
+                </p>
+                <button
+                  type='button'
+                  onClick={handleResendVerification}
+                  className='mt-5 w-full rounded-xl border border-line-strong bg-page-solid px-4 py-3 text-sm font-semibold text-secondary transition hover:bg-card-hover'
+                >
+                  Resend verification email
+                </button>
+                <Link to='/login' className='mt-3 block text-center text-sm font-semibold text-accent hover:text-accent-soft'>
+                  Back to sign in
+                </Link>
+              </div>
+            ) : (
+            <>
+            <p className='text-sm font-semibold text-secondary'>Sign up with Email</p>
+
+            <form className='mt-4 space-y-5' onSubmit={handleSubmit}>
               <div>
                 <label className='mb-1.5 block text-sm font-medium text-secondary' htmlFor='fullName'>
                   Full name
@@ -193,6 +273,8 @@ function Signup() {
                 {loading ? 'Creating account...' : 'Create account'}
               </button>
             </form>
+            </>
+            )}
 
             {message ? (
               <p
